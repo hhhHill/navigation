@@ -4,16 +4,16 @@
 """
 import random
 import time
-from models.graph import Graph
-from models.vertex import Vertex
-from models.edge import Edge
-from generators.random_map import generate_random_points, generate_connected_map
+from .models.graph import Graph
+from .models.vertex import Vertex
+from .models.edge import Edge
+from .generators.random_map import generate_random_points, generate_connected_map
 
 def test_graph_creation():
     """测试基本的图创建功能"""
     print("=== 测试基本的图创建功能 ===")
     
-    # 创建一个图
+    # 创建一个图 
     graph = Graph()
     
     # 创建一些顶点
@@ -28,6 +28,7 @@ def test_graph_creation():
     e3 = graph.create_edge(v3, v4, 100)
     e4 = graph.create_edge(v4, v1, 150)
     e5 = graph.create_edge(v1, v3, 200)
+    
     
     # 输出图信息
     print(f"图中有 {len(graph.vertices)} 个顶点和 {len(graph.edges)} 条边")
@@ -51,7 +52,7 @@ def test_graph_creation():
     print(f"边 e1 的通行时间: {e1.travel_time():.2f}")
     print(f"边 e2 的通行时间: {e2.travel_time():.2f}")
 
-def test_random_map_generation(n=100):
+def test_random_map_generation(n=1000):
     """
     测试随机地图生成功能
     
@@ -112,13 +113,13 @@ def main():
     test_graph_creation()
     
     # 测试小规模地图生成
-    small_graph = test_random_map_generation(n=100)
+    # small_graph = test_random_map_generation(n=100)
     
     # 测试中等规模地图生成
-    medium_graph = test_random_map_generation(n=1000)
+    # medium_graph = test_random_map_generation(n=1000)
     
     # 如果需要，可以测试更大规模的地图生成
-    # large_graph = test_random_map_generation(n=10000)
+    large_graph = test_random_map_generation(n=10000)
     
     print("\n测试完成！")
 

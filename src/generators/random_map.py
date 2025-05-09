@@ -117,15 +117,17 @@ def generate_connected_map(vertices, edge_factor=2.5, capacity_range=(50, 200)):
         capacity = random.randint(capacity_range[0], capacity_range[1])
         graph.create_edge(v1, v2, capacity)
     
+    print(f"DEBUG: 三角剖分结束")
     # 确保图连通
     ensure_connectivity(graph)
-    
+    print(f"DEBUG: 确保图连通结束")
     # 随机添加额外的边以增加道路网络密度
     add_additional_edges(graph, edge_factor)
-    
+    print(f"DEBUG: 随机添加额外的边结束")
     # 设置道路容量
     set_road_capacities(graph, capacity_range)
-    
+    print(f"DEBUG: 设置道路容量结束")
+    print(f"DEBUG: 连通图执行完毕")
     return graph
 
 def ensure_connectivity(graph):
@@ -349,3 +351,5 @@ def set_road_capacities(graph, capacity_range=(50, 200)):
         normalized_length = min(1.0, edge.length / 100)  # 归一化长度
         capacity = int(min_cap + normalized_length * (max_cap - min_cap))
         edge.capacity = capacity 
+
+    

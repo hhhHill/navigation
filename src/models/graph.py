@@ -219,15 +219,15 @@ class Graph:
                 visited.add(vertex.id)
                 # 获取所有邻居顶点
                 neighbors = vertex.get_neighbors()
-                print(f"DEBUG: 顶点 {vertex.id} 的邻居: {[n.id for n in neighbors]}")
+                # print(f"DEBUG: 顶点 {vertex.id} 的邻居: {[n.id for n in neighbors]}")
                 
                 for neighbor in neighbors:
                     if neighbor.id not in visited:
                         queue.append(neighbor)
         
-        print(f"DEBUG: 已访问顶点数: {len(visited)}, 总顶点数: {len(self.vertices)}")
-        print(f"DEBUG: 已访问顶点ID: {visited}")
-        print(f"DEBUG: 图中所有顶点ID: {list(self.vertices.keys())}")
+        # print(f"DEBUG: 已访问顶点数: {len(visited)}, 总顶点数: {len(self.vertices)}")
+        # print(f"DEBUG: 已访问顶点ID: {visited}")
+        # print(f"DEBUG: 图中所有顶点ID: {list(self.vertices.keys())}")
         
         # 检查是否所有顶点都被访问
         return len(visited) == len(self.vertices)

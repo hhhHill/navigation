@@ -1,2 +1,6 @@
 .cursor/
 mode_rules.md
+src/generators/__pycache__/*
+src/generators/delaunay_increment/__pycache__/*
+src/generators/delaunay/__pycache__/*
+src/generators/random_map/__pycache__/*
