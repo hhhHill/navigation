@@ -4,53 +4,14 @@
 """
 import random
 import time
+import os
 from .models.graph import Graph
 from .models.vertex import Vertex
 from .models.edge import Edge
 from .generators.random_map import generate_random_points, generate_connected_map
+from .exporters.json_exporter import export_graph_to_json
+from .api.server import run_server
 
-def test_graph_creation():
-    """测试基本的图创建功能"""
-    print("=== 测试基本的图创建功能 ===")
-    
-    # 创建一个图 
-    graph = Graph()
-    
-    # 创建一些顶点
-    v1 = graph.create_vertex(0, 0)
-    v2 = graph.create_vertex(3, 0)
-    v3 = graph.create_vertex(3, 4)
-    v4 = graph.create_vertex(0, 4)
-    
-    # 创建一些边
-    e1 = graph.create_edge(v1, v2, 100)
-    e2 = graph.create_edge(v2, v3, 150)
-    e3 = graph.create_edge(v3, v4, 100)
-    e4 = graph.create_edge(v4, v1, 150)
-    e5 = graph.create_edge(v1, v3, 200)
-    
-    
-    # 输出图信息
-    print(f"图中有 {len(graph.vertices)} 个顶点和 {len(graph.edges)} 条边")
-    
-    # 检查图的连通性
-    print(f"图是否连通: {graph.is_connected()}")
-    
-    # 获取附近顶点
-    nearby = graph.get_nearby_vertices(1, 1, n=2)
-    print(f"距离点 (1,1) 最近的 2 个顶点: {nearby}")
-    
-    # 更新边上的车辆数量
-    e1.update_vehicles(80)
-    e2.update_vehicles(200)
-    
-    # 显示边的信息
-    print(f"边 e1: {e1}, 拥堵等级: {e1.get_congestion_level()}")
-    print(f"边 e2: {e2}, 拥堵等级: {e2.get_congestion_level()}")
-    
-    # 计算通行时间
-    print(f"边 e1 的通行时间: {e1.travel_time():.2f}")
-    print(f"边 e2 的通行时间: {e2.travel_time():.2f}")
 
 def test_random_map_generation(n=1000):
     """
@@ -104,24 +65,46 @@ def test_random_map_generation(n=1000):
     
     return graph
 
+def export_and_serve_map(graph, data_path=None, run_web_server=True):
+    """
+    导出地图数据并运行Web服务器
+    
+    参数:
+        graph: 要导出的Graph对象
+        data_path: 数据保存路径，默认为项目根目录下的data/map_data.json
+        run_web_server: 是否启动Web服务器
+    """
+    # 确定数据目录
+    if data_path is None:
+        # 获取当前文件所在目录的上两级目录（项目根目录）
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        data_dir = os.path.join(project_root, 'data')
+        # 确保数据目录存在
+        os.makedirs(data_dir, exist_ok=True)
+        data_path = os.path.join(data_dir, 'map_data.json')
+    
+    # 导出地图数据
+    export_graph_to_json(graph, data_path)
+    
+    # 运行Web服务器
+    if run_web_server:
+        run_server(host='127.0.0.1', port=5000, debug=True)
+
 def main():
     """主函数"""
     print("导航系统 - 阶段1和阶段2测试")
     print("------------------------------")
     
-    # 测试基本图功能
-    test_graph_creation()
     
-    # 测试小规模地图生成
-    # small_graph = test_random_map_generation(n=100)
     
-    # 测试中等规模地图生成
-    # medium_graph = test_random_map_generation(n=1000)
+    # 测试小规模地图生成（为了前端渲染效率，使用较小的规模）
+    graph = test_random_map_generation(n=100)
     
-    # 如果需要，可以测试更大规模的地图生成
-    large_graph = test_random_map_generation(n=10000)
+    # 导出数据并启动服务器
+    print("\n准备导出地图数据并启动Web服务...")
+    export_and_serve_map(graph)
     
-    print("\n测试完成！")
-
+    # 注意：服务器启动后，主程序会阻塞在这里
+    
 if __name__ == "__main__":
     main() 

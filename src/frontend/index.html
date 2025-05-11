@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>导航系统地图渲染</title>
+  <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      font-family: Arial, sans-serif;
+    }
+    #map-container {
+      width: 100%;
+      height: 100vh;
+      background-color: #f9f9f9;
+    }
+    .loading {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 24px;
+    }
+  </style>
+</head>
+<body>
+  <div id="map-container">
+    <div class="loading">加载地图数据中...</div>
+  </div>
+
+  <script>
+    // 地图渲染函数
+    function renderMap(data) {
+      // 创建一个network容器
+      const container = document.getElementById("map-container");
+      
+      // 准备数据
+      const nodes = new vis.DataSet(data.nodes);
+      const edges = new vis.DataSet(data.edges);
+      
+      // 创建网络图配置
+      const options = {
+        physics: {
+          enabled: false  // 禁用物理引擎，保持节点位置固定
+        },
+        nodes: {
+          shape: "circle",
+          size: 1,
+          font: {
+            size: 1,
+            color: "#66ccff"
+          },
+          borderWidth: 2,
+          color: {
+            border: "#66ccff",
+            background: "#66ccff"
+          }
+        },
+        edges: {
+          width: 2,
+          color: {
+            color: "#848484",
+            highlight: "#FF0000"
+          }
+        }
+      };
+      
+      // 创建网络图
+      const network = new vis.Network(container, { nodes, edges }, options);
+      
+      // 移除加载提示
+      const loadingElement = document.querySelector(".loading");
+      if (loadingElement) {
+        loadingElement.remove();
+      }
+      
+      console.log("地图渲染完成");
+    }
+
+    // 获取地图数据
+    async function fetchMapData() {
+      try {
+        const response = await fetch('/api/map-data');
+        if (!response.ok) {
+          throw new Error(`HTTP error: ${response.status}`);
+        }
+        const data = await response.json();
+        renderMap(data);
+      } catch (error) {
+        console.error("获取地图数据失败:", error);
+        document.querySelector(".loading").textContent = "加载地图数据失败，请刷新重试";
+      }
+    }
+
+    // 页面加载后获取数据
+    document.addEventListener('DOMContentLoaded', fetchMapData);
+  </script>
+</body>
+</html> 
