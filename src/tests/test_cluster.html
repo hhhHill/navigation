@@ -1,248 +1,178 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>Vis.js 集群功能演示</title>
+    <title>按颜色集群演示</title>
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <style type="text/css">
         body {
             font-family: Arial, sans-serif;
             margin: 0;
-            padding: 0;
-        }
-        #container {
-            width: 100%;
-            display: flex;
-            flex-direction: column;
-            padding: 10px;
-            box-sizing: border-box;
-        }
-        h1 {
-            text-align: center;
-            margin-bottom: 20px;
-        }
-        .content {
-            display: flex;
-            height: 800px;
+            padding: 20px;
         }
         #mynetwork {
-            flex: 3;
-            height: 100%;
+            width: 800px;
+            height: 600px;
             border: 1px solid lightgray;
         }
-        .panel {
-            flex: 1;
-            padding: 20px;
+        #info {
+            margin-top: 10px;
+            padding: 10px;
             background-color: #f8f8f8;
             border: 1px solid #ddd;
-            margin-right: 10px;
-            overflow-y: auto;
         }
-        .controls-group {
-            margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 1px solid #ddd;
+        .colorBox {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            margin-right: 5px;
+            vertical-align: middle;
         }
+        .yellow { background-color: yellow; }
+        .red { background-color: red; }
+        .blue { background-color: blue; }
+        .green { background-color: green; }
         button {
             padding: 8px 12px;
-            margin: 5px 0;
+            margin-right: 8px;
+            margin-bottom: 10px;
             background-color: #4CAF50;
             color: white;
             border: none;
             border-radius: 4px;
             cursor: pointer;
-            display: block;
-            width: 100%;
         }
         button:hover {
             background-color: #45a049;
         }
-        .reset {
-            background-color: #f44336;
-        }
-        .reset:hover {
-            background-color: #d32f2f;
-        }
-        label {
-            display: block;
-            margin: 5px 0;
-        }
-        input, select {
-            margin-bottom: 10px;
-            padding: 5px;
-            width: 100%;
-            box-sizing: border-box;
-        }
-        #nodeInfo {
-            background-color: #e8f5e9;
-            padding: 10px;
-            border-radius: 4px;
-            margin-top: 10px;
+        h1, h3 {
+            color: #333;
         }
     </style>
 </head>
 <body>
-    <div id="container">
-        <h1>Vis.js 集群功能演示</h1>
-        <div class="content">
-            <div class="panel">
-                <div class="controls-group">
-                    <h3>基本集群方法</h3>
-                    <button id="clusterByConnection">按连接集群</button>
-                    <select id="connectionNodeId">
-                        <!-- 将由JavaScript填充 -->
-                    </select>
-
-                    <button id="clusterByHubsize">按中心度集群</button>
-                    <label for="hubsize">最小边数:</label>
-                    <input type="number" id="hubsize" value="2" min="1">
-
-                    <button id="clusterOutliers">集群离群点</button>
-                </div>
-
-                <div class="controls-group">
-                    <h3>自定义集群</h3>
-                    <button id="clusterByColor">按颜色集群</button>
-                    <label for="clusterColor">选择颜色:</label>
-                    <select id="clusterColor">
-                        <option value="red">红色</option>
-                        <option value="green">绿色</option>
-                        <option value="blue">蓝色</option>
-                    </select>
-
-                    <button id="clusterByProperty">按属性集群</button>
-                    <label for="clusterProperty">属性名:</label>
-                    <input type="text" id="clusterProperty" value="group">
-                    <label for="propertyValue">属性值:</label>
-                    <input type="text" id="propertyValue" value="1">
-                </div>
-
-                <div class="controls-group">
-                    <h3>集群属性</h3>
-                    <label for="clusterLabel">集群标签:</label>
-                    <input type="text" id="clusterLabel" value="集群">
-                    <label for="clusterBackgroundColor">背景颜色:</label>
-                    <input type="color" id="clusterBackgroundColor" value="#CCDDEE">
-                    <label for="clusterBorderColor">边框颜色:</label>
-                    <input type="color" id="clusterBorderColor" value="#2B7CE9">
-                    <label for="clusterShape">形状:</label>
-                    <select id="clusterShape">
-                        <option value="ellipse">椭圆</option>
-                        <option value="circle">圆形</option>
-                        <option value="box" selected>方形</option>
-                        <option value="diamond">菱形</option>
-                        <option value="star">星形</option>
-                        <option value="triangle">三角形</option>
-                    </select>
-                </div>
-
-                <div class="controls-group">
-                    <h3>操作</h3>
-                    <button id="resetClusters" class="reset">重置所有集群</button>
-                    <div id="nodeInfo">
-                        <p>双击集群节点打开集群</p>
-                        <p>选中节点: <span id="selectedNode">无</span></p>
-                    </div>
-                </div>
-            </div>
-            <div id="mynetwork"></div>
-        </div>
+    <h1>按颜色集群演示</h1>
+    
+    <div>
+        <button id="resetBtn">重置集群</button>
+        <button id="clusterRedBtn">集群红色节点</button>
+        <button id="clusterBlueBtn">集群蓝色节点</button>
+        <button id="clusterGreenBtn">集群绿色节点</button>
+        <button id="checkStatusBtn">检查集群状态</button>
     </div>
-
+    
+    <div id="mynetwork"></div>
+    
+    <div id="info">
+        <h3>缩放信息</h3>
+        <p>当前缩放比例: <span id="scaleLevel">1.00</span></p>
+        <p>集群状态:</p>
+        <ul>
+            <li><div class="colorBox red"></div> 红色节点: <span id="redStatus">未集群</span> (缩放 ≤ 0.80 时集群)</li>
+            <li><div class="colorBox blue"></div> 蓝色节点: <span id="blueStatus">未集群</span> (缩放 ≤ 0.50 时集群)</li>
+            <li><div class="colorBox green"></div> 绿色节点: <span id="greenStatus">未集群</span> (缩放 ≤ 0.20 时集群)</li>
+            <li><div class="colorBox yellow"></div> 黄色节点: 不集群</li>
+        </ul>
+        <div id="statusInfo"></div>
+    </div>
+    
     <script type="text/javascript">
-        // 创建一个更复杂的节点数据集
+        // 颜色定义
+        const COLORS = ['yellow', 'red', 'blue', 'green'];
+        
+        // 集群ID定义
+        const CLUSTER_IDS = {
+            'red': 'redCluster',
+            'blue': 'blueCluster',
+            'green': 'greenCluster'
+        };
+        
+        // 跟踪每种颜色的节点
+        var colorNodes = {
+            'yellow': [],
+            'red': [],
+            'blue': [],
+            'green': []
+        };
+        
+        // 标记集群状态
+        var clusterStatus = {
+            'red': false,
+            'blue': false,
+            'green': false
+        };
+        
+        // 创建数据集
         var nodes = new vis.DataSet();
         var edges = new vis.DataSet();
-
-        // 添加节点
-        for (let i = 1; i <= 50; i++) {
-            let group = Math.floor((i - 1) / 10) + 1; // 将节点分为5组
-            let color;
+        
+        // 生成随机节点
+        function generateNodes(count) {
+            // 清空现有数据
+            nodes.clear();
+            edges.clear();
+            colorNodes = {'yellow': [], 'red': [], 'blue': [], 'green': []};
             
-            switch(group) {
-                case 1: color = "red"; break;
-                case 2: color = "green"; break;
-                case 3: color = "blue"; break;
-                case 4: color = "orange"; break;
-                case 5: color = "purple"; break;
+            // 重置集群状态
+            clusterStatus = {'red': false, 'blue': false, 'green': false};
+            updateClusterStatus();
+            
+            // 创建节点
+            for (var i = 1; i <= count; i++) {
+                // 随机选择颜色
+                var colorIndex = Math.floor(Math.random() * COLORS.length);
+                var color = COLORS[colorIndex];
+                
+                var node = {
+                    id: i,
+                    label: "节点 " + i,
+                    color: {
+                        background: color,
+                        border: '#000000'
+                    }
+                };
+                
+                nodes.add(node);
+                colorNodes[color].push(i);
             }
             
-            nodes.add({
-                id: i,
-                label: "节点 " + i,
-                group: group,
-                color: {
-                    background: color,
-                    border: '#000000'
-                }
-            });
-        }
-
-        // 添加边 - 创建一些模式
-        // 组内连接 - 确保同组的节点有连接
-        for (let group = 1; group <= 5; group++) {
-            let groupStart = (group - 1) * 10 + 1;
-            let groupEnd = group * 10;
+            // 创建边 - 确保图是连通的
+            for (var i = 1; i < count; i++) {
+                edges.add({
+                    from: i,
+                    to: i + 1
+                });
+            }
             
-            for (let i = groupStart; i <= groupEnd; i++) {
-                // 连接到同组的2-3个其他节点
-                let connections = Math.floor(Math.random() * 2) + 2; // 2-3个连接
+            // 添加一些随机边增加复杂性
+            for (var i = 0; i < count/2; i++) {
+                var from = Math.floor(Math.random() * count) + 1;
+                var to = Math.floor(Math.random() * count) + 1;
                 
-                for (let j = 0; j < connections; j++) {
-                    let target;
-                    do {
-                        target = Math.floor(Math.random() * (groupEnd - groupStart + 1)) + groupStart;
-                    } while (target === i); // 避免自连接
-                    
+                if (from !== to && !edgeExists(from, to)) {
                     edges.add({
-                        from: i,
-                        to: target
+                        from: from,
+                        to: to
                     });
                 }
             }
+            
+            // 显示每种颜色的节点数量
+            updateStatusInfo();
         }
-
-        // 组间连接 - 添加一些跨组的连接
-        for (let i = 0; i < 15; i++) { // 添加15个跨组连接
-            let from = Math.floor(Math.random() * 50) + 1;
-            let fromGroup = Math.floor((from - 1) / 10) + 1;
-            
-            let toGroup;
-            do {
-                toGroup = Math.floor(Math.random() * 5) + 1;
-            } while (toGroup === fromGroup); // 确保是不同的组
-            
-            let toStart = (toGroup - 1) * 10 + 1;
-            let to = Math.floor(Math.random() * 10) + toStart;
-            
-            edges.add({
-                from: from,
-                to: to
-            });
-        }
-
-        // 添加几个离群点 (只有一个连接)
-        for (let i = 0; i < 5; i++) {
-            let outlier = 46 + i; // 使用节点ID 46-50作为离群点
-            let connectedTo = Math.floor(Math.random() * 45) + 1; // 连接到节点1-45中的一个
-            
-            // 删除之前可能的多余连接
-            let connectedEdges = edges.get({
+        
+        // 检查边是否已存在
+        function edgeExists(from, to) {
+            var existingEdges = edges.get({
                 filter: function(edge) {
-                    return edge.from === outlier || edge.to === outlier;
+                    return (edge.from === from && edge.to === to) || 
+                           (edge.from === to && edge.to === from);
                 }
             });
-            
-            edges.remove(connectedEdges);
-            
-            // 只添加一个连接
-            edges.add({
-                from: outlier,
-                to: connectedTo
-            });
+            return existingEdges.length > 0;
         }
-
+        
         // 创建网络
-        var container = document.getElementById('mynetwork');
+        var container = document.getElementById("mynetwork");
         var data = {
             nodes: nodes,
             edges: edges
@@ -252,10 +182,8 @@
                 stabilization: true,
                 barnesHut: {
                     gravitationalConstant: -2000,
-                    centralGravity: 0.1,
                     springLength: 95,
-                    springConstant: 0.04,
-                    damping: 0.09
+                    springConstant: 0.04
                 }
             },
             nodes: {
@@ -263,152 +191,224 @@
                 size: 16,
                 font: {
                     size: 12,
-                    face: 'Tahoma'
+                    color: '#000000'
                 },
                 borderWidth: 2
             },
             edges: {
                 width: 1,
                 color: {
-                    color: '#848484',
-                    highlight: '#848484',
-                    hover: '#848484'
-                },
-                smooth: {
-                    type: 'continuous'
+                    color: '#848484'
                 }
             },
             interaction: {
-                hover: true,
                 navigationButtons: true,
-                keyboard: true
+                zoomView: true
             }
         };
+        
         var network = new vis.Network(container, data, options);
-
-        // 填充节点下拉列表
-        function populateNodeDropdown() {
-            var select = document.getElementById('connectionNodeId');
-            select.innerHTML = '';
+        
+        // 生成100个节点
+        generateNodes(100);
+        
+        // 监听缩放事件
+        var currentScale = 1.0;
+        network.on("zoom", function(params) {
+            currentScale = params.scale;
+            document.getElementById("scaleLevel").textContent = currentScale.toFixed(2);
             
-            var nodeIds = nodes.getIds();
-            for (var i = 0; i < nodeIds.length; i++) {
-                var option = document.createElement('option');
-                option.value = nodeIds[i];
-                option.text = '节点 ' + nodeIds[i];
-                select.appendChild(option);
-            }
-        }
-        populateNodeDropdown();
-
-        // 获取集群属性对象
-        function getClusterOptions() {
-            return {
-                joinCondition: null, // 将由各个函数定义
-                processProperties: function(clusterOptions, childNodes, childEdges) {
-                    // 计算总数并设置标签
-                    clusterOptions.label = document.getElementById('clusterLabel').value + ' (' + childNodes.length + '个节点)';
-                    return clusterOptions;
-                },
-                clusterNodeProperties: {
-                    shape: document.getElementById('clusterShape').value,
-                    color: {
-                        background: document.getElementById('clusterBackgroundColor').value,
-                        border: document.getElementById('clusterBorderColor').value
-                    },
-                    borderWidth: 3,
-                    font: { size: 16 }
-                }
-            };
-        }
-
-        // 按连接进行集群
-        document.getElementById('clusterByConnection').addEventListener('click', function() {
-            var nodeId = document.getElementById('connectionNodeId').value;
-            network.clustering.clusterByConnection(nodeId, getClusterOptions());
+            // 根据缩放自动集群
+            checkScaleAndCluster();
         });
-
-        // 按中心度进行集群
-        document.getElementById('clusterByHubsize').addEventListener('click', function() {
-            var hubsize = parseInt(document.getElementById('hubsize').value);
-            network.clustering.clusterByHubsize(hubsize, getClusterOptions());
-        });
-
-        // 集群离群点
-        document.getElementById('clusterOutliers').addEventListener('click', function() {
-            network.clustering.clusterOutliers(getClusterOptions());
-        });
-
-        // 按颜色进行集群
-        document.getElementById('clusterByColor').addEventListener('click', function() {
-            var color = document.getElementById('clusterColor').value;
-            var options = getClusterOptions();
-            
-            options.joinCondition = function(nodeOptions) {
-                return nodeOptions.color && 
-                       nodeOptions.color.background && 
-                       nodeOptions.color.background === color;
-            };
-            
-            network.clustering.cluster(options);
-        });
-
-        // 按属性进行集群
-        document.getElementById('clusterByProperty').addEventListener('click', function() {
-            var property = document.getElementById('clusterProperty').value;
-            var value = document.getElementById('propertyValue').value;
-            var options = getClusterOptions();
-            
-            options.joinCondition = function(nodeOptions) {
-                return nodeOptions[property] !== undefined && 
-                       nodeOptions[property].toString() === value;
-            };
-            
-            network.clustering.cluster(options);
-        });
-
-        // 重置所有集群
-        document.getElementById('resetClusters').addEventListener('click', function() {
-            network.clustering.clusterOutliers();
-            var clusterNodeIds = [];
-            var allNodeIds = nodes.getIds();
-            
-            // 找出所有集群节点
-            for (var i = 0; i < allNodeIds.length; i++) {
-                if (network.clustering.isCluster(allNodeIds[i])) {
-                    clusterNodeIds.push(allNodeIds[i]);
-                }
-            }
-            
-            // 打开所有集群
-            for (var i = 0; i < clusterNodeIds.length; i++) {
-                network.clustering.openCluster(clusterNodeIds[i]);
-            }
-            
-            document.getElementById('selectedNode').textContent = '无';
-        });
-
-        // 双击打开集群
-        network.on('doubleClick', function(params) {
+        
+        // 监听双击事件
+        network.on("doubleClick", function(params) {
             if (params.nodes.length === 1) {
                 var nodeId = params.nodes[0];
                 if (network.clustering.isCluster(nodeId)) {
-                    network.clustering.openCluster(nodeId);
+                    console.log("双击打开集群: " + nodeId);
+                    openCluster(nodeId);
                 }
             }
         });
-
-        // 更新选中节点信息
-        network.on('click', function(params) {
-            if (params.nodes.length === 1) {
-                var nodeId = params.nodes[0];
-                var isCluster = network.clustering.isCluster(nodeId);
-                var nodeText = '节点 ' + nodeId + (isCluster ? ' (集群)' : '');
-                document.getElementById('selectedNode').textContent = nodeText;
-            } else {
-                document.getElementById('selectedNode').textContent = '无';
+        
+        // 检查缩放级别并执行相应的集群操作
+        function checkScaleAndCluster() {
+            // 红色节点集群 (缩放 <= 0.80)
+            if (currentScale <= 0.80 && !clusterStatus.red) {
+                clusterByColor('red');
+            } else if (currentScale > 0.80 && clusterStatus.red) {
+                openCluster(CLUSTER_IDS.red);
             }
+            
+            // 蓝色节点集群 (缩放 <= 0.50)
+            if (currentScale <= 0.50 && !clusterStatus.blue) {
+                clusterByColor('blue');
+            } else if (currentScale > 0.50 && clusterStatus.blue) {
+                openCluster(CLUSTER_IDS.blue);
+            }
+            
+            // 绿色节点集群 (缩放 <= 0.20)
+            if (currentScale <= 0.20 && !clusterStatus.green) {
+                clusterByColor('green');
+            } else if (currentScale > 0.20 && clusterStatus.green) {
+                openCluster(CLUSTER_IDS.green);
+            }
+        }
+        
+        // 按颜色集群节点
+        function clusterByColor(color) {
+            if (colorNodes[color].length === 0 || clusterStatus[color]) {
+                console.log(color + "节点没有可集群的节点或已经集群");
+                return;
+            }
+            
+            var clusterProps = {
+                'red': { background: 'red', label: '红色节点集群', id: CLUSTER_IDS.red },
+                'blue': { background: 'blue', label: '蓝色节点集群', id: CLUSTER_IDS.blue },
+                'green': { background: 'green', label: '绿色节点集群', id: CLUSTER_IDS.green }
+            };
+            
+            try {
+                // 创建集群
+                network.cluster({
+                    joinCondition: function(nodeOptions) {
+                        return colorNodes[color].includes(nodeOptions.id);
+                    },
+                    processProperties: function(clusterOptions, childNodes) {
+                        clusterOptions.id = clusterProps[color].id;
+                        clusterOptions.label = clusterProps[color].label + 
+                                              ' (' + childNodes.length + '个节点)';
+                        clusterOptions.color = {
+                            background: clusterProps[color].background,
+                            border: '#000000'
+                        };
+                        clusterOptions.font = { color: 'white' };
+                        return clusterOptions;
+                    },
+                    clusterNodeProperties: {
+                        id: clusterProps[color].id,
+                        borderWidth: 3,
+                        shape: 'box',
+                        font: { size: 14 }
+                    }
+                });
+                
+                clusterStatus[color] = true;
+                updateClusterStatus();
+                console.log(color + "节点已集群为" + clusterProps[color].id);
+            } catch (e) {
+                console.error("集群创建失败:", e);
+            }
+        }
+        
+        // 打开指定的集群
+        function openCluster(clusterId) {
+            try {
+                if (network.clustering.isCluster(clusterId)) {
+                    console.log("打开集群: " + clusterId);
+                    network.clustering.openCluster(clusterId);
+                    
+                    // 更新集群状态
+                    for (let color in CLUSTER_IDS) {
+                        if (CLUSTER_IDS[color] === clusterId) {
+                            clusterStatus[color] = false;
+                            break;
+                        }
+                    }
+                    
+                    updateClusterStatus();
+                } else {
+                    console.log("集群 " + clusterId + " 不存在或已被打开");
+                }
+            } catch (e) {
+                console.error("打开集群出错:", e);
+            }
+        }
+        
+        // 重置所有集群
+        function resetAllClusters() {
+            try {
+                console.log("重置所有集群");
+                
+                // 使用vis.js提供的方法打开所有集群
+                network.clustering.openClusters();
+                
+                // 重置集群状态
+                clusterStatus = {'red': false, 'blue': false, 'green': false};
+                updateClusterStatus();
+                updateStatusInfo("所有集群已重置");
+                
+                // 根据当前缩放重新应用集群
+                setTimeout(checkScaleAndCluster, 100);
+            } catch (e) {
+                console.error("重置集群出错:", e);
+                updateStatusInfo("重置集群出错: " + e.message);
+            }
+        }
+        
+        // 更新集群状态显示
+        function updateClusterStatus() {
+            document.getElementById('redStatus').textContent = clusterStatus.red ? "已集群" : "未集群";
+            document.getElementById('blueStatus').textContent = clusterStatus.blue ? "已集群" : "未集群";
+            document.getElementById('greenStatus').textContent = clusterStatus.green ? "已集群" : "未集群";
+        }
+        
+        // 更新状态信息
+        function updateStatusInfo(message) {
+            let info = message || "";
+            
+            info += "<br><br>颜色节点统计:<br>";
+            info += "黄色节点: " + colorNodes.yellow.length + "<br>";
+            info += "红色节点: " + colorNodes.red.length + "<br>";
+            info += "蓝色节点: " + colorNodes.blue.length + "<br>";
+            info += "绿色节点: " + colorNodes.green.length + "<br>";
+            
+            document.getElementById('statusInfo').innerHTML = info;
+        }
+        
+        // 检查网络中集群的状态
+        function checkClusterStatus() {
+            let info = "集群检测结果：<br>";
+            
+            // 检查各颜色集群是否存在
+            info += `redCluster 是否为集群: ${network.clustering.isCluster(CLUSTER_IDS.red)}<br>`;
+            info += `blueCluster 是否为集群: ${network.clustering.isCluster(CLUSTER_IDS.blue)}<br>`;
+            info += `greenCluster 是否为集群: ${network.clustering.isCluster(CLUSTER_IDS.green)}<br><br>`;
+            
+            // 随机检查一些节点
+            for (let color in colorNodes) {
+                if (colorNodes[color].length > 0) {
+                    // 每种颜色随机选择一个节点检查
+                    let randomIndex = Math.floor(Math.random() * colorNodes[color].length);
+                    let nodeId = colorNodes[color][randomIndex];
+                    let nodeInCluster = network.clustering.findNode(nodeId.toString());
+                    
+                    info += `${color}节点 ${nodeId}: ${nodeInCluster.length > 1 ? 
+                        '在集群中 ' + nodeInCluster.join(',') : 
+                        '不在任何集群中'}<br>`;
+                }
+            }
+            
+            updateStatusInfo(info);
+        }
+        
+        // 绑定按钮事件
+        document.getElementById('resetBtn').addEventListener('click', resetAllClusters);
+        document.getElementById('clusterRedBtn').addEventListener('click', function() {
+            clusterByColor('red');
         });
+        document.getElementById('clusterBlueBtn').addEventListener('click', function() {
+            clusterByColor('blue');
+        });
+        document.getElementById('clusterGreenBtn').addEventListener('click', function() {
+            clusterByColor('green');
+        });
+        document.getElementById('checkStatusBtn').addEventListener('click', checkClusterStatus);
+        
+        // 初始状态信息更新
+        updateStatusInfo();
     </script>
 </body>
 </html>

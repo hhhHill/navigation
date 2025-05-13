@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>测试isCluster功能</title>
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <style type="text/css">
+        #mynetwork {
+            width: 800px;
+            height: 600px;
+            border: 1px solid lightgray;
+        }
+        #info {
+            margin-top: 10px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            background-color: #f9f9f9;
+            min-height: 100px;
+        }
+        .control-panel {
+            margin: 20px 0;
+        }
+        button {
+            padding: 10px 15px;
+            margin-right: 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        h1 {
+            color: #333;
+        }
+        .colorBox {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            margin-right: 5px;
+            vertical-align: middle;
+        }
+        .red { background-color: red; }
+        .blue { background-color: blue; }
+        .green { background-color: green; }
+        .yellow { background-color: yellow; }
+    </style>
+</head>
+<body>
+    <h1>测试isCluster功能</h1>
+    
+    <div class="control-panel">
+        <button onclick="clusterNodes()">创建集群</button>
+        <button onclick="checkClusters()">检查节点集群状态</button>
+        <button onclick="resetAllClusters()">重置所有集群</button>
+    </div>
+    
+    <div id="mynetwork"></div>
+    <div id="info">
+        <p>当前缩放比例: <span id="scaleLevel">1.00</span></p>
+        <p>缩放比例 ≤ 0.80 时自动创建集群，> 0.80 时自动打开集群</p>
+        <p>集群状态:</p>
+        <ul>
+            <li><div class="colorBox red"></div> 红色集群 (cluster1): <span id="cluster1Status">未创建</span></li>
+            <li><div class="colorBox green"></div> 绿色集群 (cluster2): <span id="cluster2Status">未创建</span></li>
+        </ul>
+    </div>
+
+    <script type="text/javascript">
+        // 创建一个包含10个节点的网络
+        var nodes = new vis.DataSet([
+            {id: 1, label: '节点 1', color: {background: 'yellow'}},
+            {id: 2, label: '节点 2', color: {background: 'red'}},
+            {id: 3, label: '节点 3', color: {background: 'red'}},
+            {id: 4, label: '节点 4', color: {background: 'red'}},
+            {id: 5, label: '节点 5', color: {background: 'yellow'}},
+            {id: 6, label: '节点 6', color: {background: 'yellow'}},
+            {id: 7, label: '节点 7', color: {background: 'yellow'}},
+            {id: 8, label: '节点 8', color: {background: 'green'}},
+            {id: 9, label: '节点 9', color: {background: 'green'}},
+            {id: 10, label: '节点 10', color: {background: 'yellow'}}
+        ]);
+
+        // 创建边
+        var edges = new vis.DataSet([
+            {from: 1, to: 2},
+            {from: 1, to: 3},
+            {from: 2, to: 4},
+            {from: 2, to: 5},
+            {from: 5, to: 6},
+            {from: 6, to: 7},
+            {from: 7, to: 8},
+            {from: 8, to: 9},
+            {from: 9, to: 10},
+            {from: 10, to: 1}
+        ]);
+
+        // 创建网络容器
+        var container = document.getElementById('mynetwork');
+
+        // 提供数据
+        var data = {
+            nodes: nodes,
+            edges: edges
+        };
+
+        // 跟踪集群状态
+        var clusterStatus = {
+            'cluster1': false,
+            'cluster2': false
+        };
+
+        // 网络选项
+        var options = {
+            physics: {
+                stabilization: true
+            },
+            nodes: {
+                shape: 'dot',
+                size: 16
+            },
+            interaction: {
+                navigationButtons: true,
+                zoomView: true
+            }
+        };
+
+        // 初始化网络
+        var network = new vis.Network(container, data, options);
+
+        // 监听缩放事件
+        var currentScale = 1.0;
+        network.on("zoom", function (params) {
+            currentScale = params.scale;
+            document.getElementById("scaleLevel").textContent = currentScale.toFixed(2);
+            console.log("缩放级别: " + currentScale.toFixed(2));
+            
+            // 根据缩放自动集群
+            checkScaleAndCluster();
+        });
+
+        // 监听双击事件，打开集群
+        network.on("doubleClick", function(params) {
+            if (params.nodes.length === 1) {
+                var nodeId = params.nodes[0];
+                if (network.clustering.isCluster(nodeId)) {
+                    console.log("双击打开集群: " + nodeId);
+                    openCluster(nodeId);
+                }
+            }
+        });
+
+        // 检查缩放级别并执行相应的集群操作
+        function checkScaleAndCluster() {
+            console.log("根据缩放检查集群状态, 当前缩放: " + currentScale.toFixed(2));
+            
+            // 当缩放比例小于等于80%时，创建集群
+            if (currentScale <= 0.8) {
+                if (!clusterStatus.cluster1) {
+                    clusterRedNodes();
+                }
+                if (!clusterStatus.cluster2) {
+                    clusterGreenNodes();
+                }
+            } 
+            // 当缩放比例大于80%时，打开集群
+            else {
+                if (clusterStatus.cluster1) {
+                    openCluster('cluster1');
+                }
+                if (clusterStatus.cluster2) {
+                    openCluster('cluster2');
+                }
+            }
+            
+            updateClusterStatus();
+        }
+
+        // 将红色节点(2,3,4)集群
+        function clusterRedNodes() {
+            // 检查cluster1是否已经存在
+            if (clusterStatus.cluster1) {
+                return;
+            }
+            
+            // 创建红色节点集群
+            network.cluster({
+                joinCondition: function(nodeOptions) {
+                    return nodeOptions.id === 2 || nodeOptions.id === 3 || nodeOptions.id === 4;
+                },
+                clusterNodeProperties: {
+                    id: 'cluster1',
+                    label: '红色节点集群',
+                    color: {
+                        background: 'red',
+                        border: '#000000'
+                    },
+                    shape: 'diamond',
+                    font: { 
+                        color: 'white',
+                        size: 14
+                    }
+                }
+            });
+            
+            clusterStatus.cluster1 = true;
+            updateClusterStatus();
+            console.log("红色节点已集群为cluster1");
+        }
+        
+        // 将绿色节点(8,9)集群
+        function clusterGreenNodes() {
+            // 检查cluster2是否已经存在
+            if (clusterStatus.cluster2) {
+                return;
+            }
+            
+            // 创建绿色节点集群
+            network.cluster({
+                joinCondition: function(nodeOptions) {
+                    return nodeOptions.id === 8 || nodeOptions.id === 9;
+                },
+                clusterNodeProperties: {
+                    id: 'cluster2',
+                    label: '绿色节点集群',
+                    color: {
+                        background: 'green',
+                        border: '#000000'
+                    },
+                    shape: 'diamond',
+                    font: { 
+                        color: 'white',
+                        size: 14
+                    }
+                }
+            });
+            
+            clusterStatus.cluster2 = true;
+            updateClusterStatus();
+            console.log("绿色节点已集群为cluster2");
+        }
+
+        // 打开指定的集群
+        function openCluster(clusterId) {
+            try {
+                if (network.clustering.isCluster(clusterId)) {
+                    console.log("打开集群: " + clusterId);
+                    network.clustering.openCluster(clusterId);
+                    
+                    // 更新集群状态
+                    if (clusterId === 'cluster1') {
+                        clusterStatus.cluster1 = false;
+                    } else if (clusterId === 'cluster2') {
+                        clusterStatus.cluster2 = false;
+                    }
+                    
+                    updateClusterStatus();
+                } else {
+                    console.log("集群 " + clusterId + " 不存在或已被打开");
+                }
+            } catch (e) {
+                console.error("打开集群出错:", e);
+            }
+        }
+        
+        // 重置所有集群
+        function resetAllClusters() {
+            try {
+                // 使用vis.js提供的方法打开所有集群
+                network.clustering.openClusters();
+                console.log("已打开所有集群");
+                
+                // 重置集群状态
+                clusterStatus = {
+                    'cluster1': false,
+                    'cluster2': false
+                };
+                
+                updateClusterStatus();
+                displayInfo("所有集群已重置");
+            } catch (e) {
+                console.error("重置集群出错:", e);
+                displayInfo("重置集群出错: " + e.message);
+            }
+        }
+
+        // 创建集群 (原按钮功能)
+        function clusterNodes() {
+            clusterRedNodes();
+            clusterGreenNodes();
+            displayInfo("已创建两个集群：<br>集群1 (红色) 包含节点2,3,4<br>集群2 (绿色) 包含节点8,9");
+        }
+
+        // 检查节点是否在集群中
+        function checkClusters() {
+            let info = "集群检测结果：<br>";
+            
+            // 检查所有节点的集群状态
+            for (let i = 1; i <= 10; i++) {
+                let nodeInCluster = network.clustering.findNode(i.toString());
+                
+                // 如果findNode返回的数组长度大于1，说明节点在集群内部
+                info += `节点 ${i}: ${nodeInCluster.length > 1 ? '在集群中 ' + nodeInCluster.join(',') : '不在任何内部集群中'}<br>`;
+            }
+            
+            // 检查集群本身是否为集群节点
+            info += `<br>节点 cluster1 是否为集群节点: ${network.clustering.isCluster("cluster1")}<br>`;
+            info += `节点 cluster2 是否为集群节点: ${network.clustering.isCluster("cluster2")}<br>`;
+            
+            displayInfo(info);
+        }
+        
+        // 更新集群状态显示
+        function updateClusterStatus() {
+            document.getElementById('cluster1Status').textContent = clusterStatus.cluster1 ? "已创建" : "未创建";
+            document.getElementById('cluster2Status').textContent = clusterStatus.cluster2 ? "已创建" : "未创建";
+        }
+        
+        // 显示信息
+        function displayInfo(text) {
+            document.getElementById("info").innerHTML = `
+                <p>当前缩放比例: <span id="scaleLevel">${currentScale.toFixed(2)}</span></p>
+                <p>缩放比例 ≤ 0.80 时自动创建集群，> 0.80 时自动打开集群</p>
+                <p>集群状态:</p>
+                <ul>
+                    <li><div class="colorBox red"></div> 红色集群 (cluster1): <span id="cluster1Status">${clusterStatus.cluster1 ? "已创建" : "未创建"}</span></li>
+                    <li><div class="colorBox green"></div> 绿色集群 (cluster2): <span id="cluster2Status">${clusterStatus.cluster2 ? "已创建" : "未创建"}</span></li>
+                </ul>
+                <hr>
+                ${text}
+            `;
+        }
+    </script>
+</body>
+</html>

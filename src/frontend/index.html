@@ -72,6 +72,187 @@
       // 创建网络图
       const network = new vis.Network(container, { nodes, edges }, options);
       
+      // 用于存储创建的集群ID
+      let clusterIds = [];
+      
+      // 记录当前是否已经集群化
+      let isClustered = false;
+      
+      // 集群距离阈值（单位：像素）
+      const clusterDistanceThreshold = 50;
+      
+      // 添加缩放事件监听
+      let currentScale = network.getScale();
+      
+      // 创建一个提示元素，提示当前的缩放比例
+      const scaleInfo = document.createElement('div');
+      scaleInfo.style.position = 'absolute';
+      scaleInfo.style.bottom = '20px';
+      scaleInfo.style.right = '20px';
+      scaleInfo.style.padding = '10px';
+      scaleInfo.style.backgroundColor = 'rgba(0,0,0,0.7)';
+      scaleInfo.style.color = 'white';
+      scaleInfo.style.borderRadius = '5px';
+      scaleInfo.style.display = 'none';
+      scaleInfo.style.zIndex = '1000';
+      container.appendChild(scaleInfo);
+      
+      // 根据距离对节点进行集群
+      function clusterByDistance() {
+        if (isClustered) return; // 如果已经集群化，不再重复执行
+        
+        // 获取所有节点的位置
+        const positions = network.getPositions();
+        const nodeIds = nodes.getIds();
+        
+        // 用于标记已经被集群的节点
+        const clusteredNodes = new Set();
+        
+        // 遍历所有节点对，检查距离
+        for (let i = 0; i < nodeIds.length; i++) {
+          const nodeId1 = nodeIds[i];
+          
+          // 如果节点已经被集群，跳过
+          if (clusteredNodes.has(nodeId1)) continue;
+          
+          const pos1 = positions[nodeId1];
+          if (!pos1) continue;
+          
+          // 该节点的集群成员
+          const clusterMembers = [nodeId1];
+          
+          for (let j = i + 1; j < nodeIds.length; j++) {
+            const nodeId2 = nodeIds[j];
+            
+            // 如果节点已经被集群，跳过
+            if (clusteredNodes.has(nodeId2)) continue;
+            
+            const pos2 = positions[nodeId2];
+            if (!pos2) continue;
+            
+            // 计算两个节点之间的距离
+            const distance = Math.sqrt(
+              Math.pow(pos1.x - pos2.x, 2) + Math.pow(pos1.y - pos2.y, 2)
+            );
+            
+            // 如果距离小于阈值，将第二个节点添加到集群成员中
+            if (distance < clusterDistanceThreshold) {
+              clusterMembers.push(nodeId2);
+            }
+          }
+          
+          // 如果集群中有多个节点，创建集群
+          if (clusterMembers.length > 1) {
+            const clusterId = 'cluster_' + nodeId1;
+            
+            // 使用vis.js的集群API创建集群
+            const clusterOptions = {
+              joinCondition: function(nodeOptions) {
+                return clusterMembers.includes(nodeOptions.id);
+              },
+              processProperties: function(clusterOptions, childNodes) {
+                // 计算集群的属性，例如标签
+                clusterOptions.label = '集群 (' + childNodes.length + ' 个节点)';
+                return clusterOptions;
+              },
+              clusterNodeProperties: {
+                id: clusterId,
+                borderWidth: 3,
+                shape: 'dot',
+                color: '#66ccff',
+                size: 10,
+                font: { size: 14 }
+              }
+            };
+            
+            network.cluster(clusterOptions);
+            
+            // 存储集群ID
+            clusterIds.push(clusterId);
+            
+            // 标记这些节点已经被集群
+            clusterMembers.forEach(id => clusteredNodes.add(id));
+          }
+        }
+        
+        isClustered = true;
+        console.log("已创建集群:", clusterIds.length);
+      }
+      
+      // 打开所有集群
+      function openAllClusters() {
+        if (!isClustered) return; // 如果没有集群，不执行操作
+        
+        // 打开所有存储的集群
+        clusterIds.forEach(clusterId => {
+          try {
+            network.openCluster(clusterId);
+          } catch (e) {
+            console.log("无法打开集群:", clusterId, e);
+          }
+        });
+        
+        // 清空集群ID数组
+        clusterIds = [];
+        isClustered = false;
+        console.log("已打开所有集群");
+      }
+      
+      // 监听缩放事件
+      network.on("zoom", function(params) {
+        currentScale = network.getScale();
+        const percentage = Math.round(currentScale * 100);
+        
+        // 显示当前缩放比例
+        scaleInfo.textContent = `缩放比例: ${percentage}%`;
+        scaleInfo.style.display = 'block';
+        
+        // 3秒后隐藏提示
+        clearTimeout(scaleInfo.timeout);
+        scaleInfo.timeout = setTimeout(() => {
+          scaleInfo.style.display = 'none';
+        }, 3000);
+        
+        // 根据缩放比例决定是否进行集群
+        if (percentage <= 80 && !isClustered) {
+          // 缩放小于80%，执行集群操作
+          clusterByDistance();
+        } else if (percentage > 80 && isClustered) {
+          // 缩放大于80%，打开所有集群
+          openAllClusters();
+        }
+        
+        // 当缩放比例小于等于50%时，阻止继续缩小
+        if (percentage <= 50 && params.direction === '-') {
+          network.moveTo({
+            scale: 0.5,  // 强制设置为50%
+            animation: {
+              duration: 300,
+              easingFunction: 'easeInOutQuad'
+            }
+          });
+          
+          // 显示警告信息
+          const warningMsg = document.createElement('div');
+          warningMsg.style.position = 'absolute';
+          warningMsg.style.top = '50%';
+          warningMsg.style.left = '50%';
+          warningMsg.style.transform = 'translate(-50%, -50%)';
+          warningMsg.style.padding = '15px';
+          warningMsg.style.backgroundColor = 'rgba(255,0,0,0.7)';
+          warningMsg.style.color = 'white';
+          warningMsg.style.borderRadius = '5px';
+          warningMsg.style.zIndex = '1001';
+          warningMsg.textContent = '已达到最小缩放比例（50%）';
+          container.appendChild(warningMsg);
+          
+          // 2秒后移除警告
+          setTimeout(() => {
+            container.removeChild(warningMsg);
+          }, 2000);
+        }
+      });
+      
       // 移除加载提示
       const loadingElement = document.querySelector(".loading");
       if (loadingElement) {
