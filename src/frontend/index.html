@@ -50,7 +50,7 @@
           label: node.label || `Node ${node.id}`,
           x: node.x,
           y: node.y,
-          size: 10,
+          size: 5,
           color:  "#66ccff"
         });
       });
@@ -114,8 +114,8 @@
             label: node.label || `Cluster ${node.id}`,
             x: node.x,
             y: node.y,
-            size: node.size || (node.weight ? node.weight * 0.1 : 0.5),  // 使用权重作为大小
-            color: node.color || "#ff6666"
+            size: 5,  // 使用权重作为大小
+            color: "#66ccff"
           });
         });
         
@@ -159,7 +159,7 @@
             label: node.label || `Node ${node.id}`,
             x: node.x,
             y: node.y,
-            size:  1,
+            size:5,
             color:  "#66ccff"
           });
         });
