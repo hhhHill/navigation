@@ -6,27 +6,7 @@
   <title>导航系统地图渲染</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/sigma.js/2.4.0/sigma.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/graphology/0.25.4/graphology.umd.min.js"></script>
-  <style>
-    body, html {
-      margin: 0;
-      padding: 0;
-      width: 100%;
-      height: 100%;
-      font-family: Arial, sans-serif;
-    }
-    #map-container {
-      width: 100%;
-      height: 100vh;
-      background-color: #f9f9f9;
-    }
-    .loading {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      font-size: 24px;
-    }
-  </style>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <div id="map-container">
@@ -83,15 +63,7 @@
       
       // 创建一个提示元素，提示当前的缩放比例
       const scaleInfo = document.createElement('div');
-      scaleInfo.style.position = 'absolute';
-      scaleInfo.style.bottom = '20px';
-      scaleInfo.style.right = '20px';
-      scaleInfo.style.padding = '10px';
-      scaleInfo.style.backgroundColor = 'rgba(0,0,0,0.7)';
-      scaleInfo.style.color = 'white';
-      scaleInfo.style.borderRadius = '5px';
-      scaleInfo.style.display = 'none';
-      scaleInfo.style.zIndex = '1000';
+      scaleInfo.className = 'scale-info';
       container.appendChild(scaleInfo);
       
       // 模式切换状态
@@ -195,6 +167,220 @@
       renderer.on("clickNode", function(event) {
         console.log("clickNode event triggered:", event.node, event.event);
       });
+
+      // 添加双击节点事件处理
+      let lastClickTime = 0;
+      const doubleClickDelay = 1000; // 毫秒
+      let selectedNodeColor = "#FF5733"; // 选中节点颜色
+      let nearbyNodeColor = "#33FF57"; // 附近节点颜色
+      let originalNodeColor = "#66ccff"; // 原始节点颜色
+      let nearbyEdgeColor = "#33FF57"; // 附近边颜色
+      let originalEdgeColor = "#848484"; // 原始边颜色
+      let nodeState = {}; // 保存节点原始状态
+      let edgeState = {}; // 保存边原始状态
+      
+      // 单击节点事件，用于实现双击功能
+      renderer.on("clickNode", function(event) {
+        const nodeId = event.node;
+        const currentTime = new Date().getTime();
+        
+        // 如果是双击（两次点击间隔小于doubleClickDelay）
+        if (currentTime - lastClickTime < doubleClickDelay) {
+          console.log("节点双击事件:", nodeId);
+          
+          // 获取节点的坐标信息
+          const nodeAttributes = graph.getNodeAttributes(nodeId);
+          const x = nodeAttributes.x;
+          const y = nodeAttributes.y;
+          
+          // 发送请求到后端获取附近节点
+          fetchNearbyNodes(x, y, 100);
+        }
+        
+        lastClickTime = currentTime;
+      });
+      
+      // 获取附近节点的函数
+      function fetchNearbyNodes(x, y, count) {
+        console.log(`获取坐标(${x}, ${y})附近的${count}个节点`);
+        
+        // 显示加载提示
+        const loadingMsg = document.createElement('div');
+        loadingMsg.textContent = '加载附近节点...';
+        loadingMsg.className = 'info-message loading-message';
+        loadingMsg.id = 'loading-nearby';
+        container.appendChild(loadingMsg);
+        
+        // 发送请求到后端
+        fetch(`/api/nearby_nodes?x=${x}&y=${y}&count=${count}`)
+          .then(response => {
+            if (!response.ok) {
+              throw new Error('网络响应错误');
+            }
+            return response.json();
+          })
+          .then(data => {
+            console.log(`获取到${data.nodes.length}个附近节点和${data.edges.length}条边`);
+            
+            // 清除之前的高亮状态
+            resetNodeAndEdgeColors();
+            
+            // 高亮双击的节点和附近节点及边
+            highlightNearbyNodes(data.nodes, data.edges);
+            
+            // 移除加载提示
+            const loadingEl = document.getElementById('loading-nearby');
+            if (loadingEl) {
+              loadingEl.remove();
+            }
+            
+            // 显示结果提示
+            const resultMsg = document.createElement('div');
+            resultMsg.textContent = `显示附近${data.nodes.length}个节点和${data.edges.length}条边`;
+            resultMsg.className = 'info-message result-message';
+            resultMsg.id = 'result-nearby';
+            container.appendChild(resultMsg);
+            
+            // 3秒后隐藏结果提示
+            setTimeout(() => {
+              const resultEl = document.getElementById('result-nearby');
+              if (resultEl) {
+                resultEl.remove();
+              }
+            }, 3000);
+          })
+          .catch(error => {
+            console.error('获取附近节点失败:', error);
+            
+            // 移除加载提示
+            const loadingEl = document.getElementById('loading-nearby');
+            if (loadingEl) {
+              loadingEl.remove();
+            }
+            
+            // 显示错误提示
+            const errorMsg = document.createElement('div');
+            errorMsg.textContent = `获取附近节点失败: ${error.message}`;
+            errorMsg.className = 'info-message error-message';
+            errorMsg.id = 'error-nearby';
+            container.appendChild(errorMsg);
+            
+            // 3秒后隐藏错误提示
+            setTimeout(() => {
+              const errorEl = document.getElementById('error-nearby');
+              if (errorEl) {
+                errorEl.remove();
+              }
+            }, 3000);
+          });
+      }
+      
+      // 高亮附近节点和边的函数
+      function highlightNearbyNodes(nodes, edges) {
+        // 保存所有节点的原始颜色
+        graph.forEachNode((nodeId, attributes) => {
+          if (!nodeState[nodeId]) {
+            nodeState[nodeId] = {
+              originalColor: attributes.color,
+              originalSize: attributes.size
+            };
+          }
+          
+          // 默认所有节点都变暗淡
+          graph.setNodeAttribute(nodeId, "color", "#cccccc");
+          graph.setNodeAttribute(nodeId, "size", attributes.size * 0.8);
+        });
+        
+        // 保存所有边的原始颜色
+        graph.forEachEdge((edgeId, attributes) => {
+          if (!edgeState[edgeId]) {
+            edgeState[edgeId] = {
+              originalColor: attributes.color,
+              originalSize: attributes.size
+            };
+          }
+          
+          // 默认所有边都变暗淡
+          graph.setEdgeAttribute(edgeId, "color", "#dddddd");
+          graph.setEdgeAttribute(edgeId, "size", attributes.size * 0.5);
+        });
+        
+        // 创建节点ID集合，用于快速查找
+        const nodeIdSet = new Set(nodes.map(node => node.id.toString()));
+        
+        // 高亮附近节点
+        nodes.forEach(node => {
+          const nodeId = node.id;
+          
+          if (graph.hasNode(nodeId)) {
+            // 对附近节点应用新颜色和大小
+            graph.setNodeAttribute(nodeId, "color", nearbyNodeColor);
+            graph.setNodeAttribute(nodeId, "size", 5);
+            
+            // 高亮第一个节点（双击的节点）为特殊颜色
+            if (node.id === nodes[0].id) {
+              graph.setNodeAttribute(nodeId, "color", selectedNodeColor);
+              graph.setNodeAttribute(nodeId, "size", 8);
+            }
+          }
+        });
+        
+        // 高亮附近边
+        edges.forEach(edge => {
+          const sourceId = edge.source;
+          const targetId = edge.target;
+          
+          // 尝试查找边
+          let graphEdge = null;
+          try {
+            graphEdge = graph.edge(sourceId, targetId);
+          } catch (e) {
+            try {
+              // 有时边的方向可能反转
+              graphEdge = graph.edge(targetId, sourceId);
+            } catch (e2) {
+              // 边不存在，忽略
+              return;
+            }
+          }
+          
+          if (graphEdge) {
+            // 对附近边应用新颜色和大小
+            graph.setEdgeAttribute(graphEdge, "color", nearbyEdgeColor);
+            graph.setEdgeAttribute(graphEdge, "size", 2);
+          }
+        });
+        
+        // 刷新渲染
+        renderer.refresh();
+      }
+      
+      // 重置节点和边颜色的函数
+      function resetNodeAndEdgeColors() {
+        // 重置节点颜色
+        graph.forEachNode((nodeId, attributes) => {
+          if (nodeState[nodeId]) {
+            graph.setNodeAttribute(nodeId, "color", nodeState[nodeId].originalColor || originalNodeColor);
+            graph.setNodeAttribute(nodeId, "size", nodeState[nodeId].originalSize || 5);
+          } else {
+            graph.setNodeAttribute(nodeId, "color", originalNodeColor);
+            graph.setNodeAttribute(nodeId, "size", 5);
+          }
+        });
+        
+        // 重置边颜色
+        graph.forEachEdge((edgeId, attributes) => {
+          if (edgeState[edgeId]) {
+            graph.setEdgeAttribute(edgeId, "color", edgeState[edgeId].originalColor || originalEdgeColor);
+            graph.setEdgeAttribute(edgeId, "size", edgeState[edgeId].originalSize || 1);
+          } else {
+            graph.setEdgeAttribute(edgeId, "color", originalEdgeColor);
+            graph.setEdgeAttribute(edgeId, "size", 1);
+          }
+        });
+        
+        renderer.refresh();
+      }
 
       // 打印所有可用的事件名称
       console.log("renderer object:", renderer);

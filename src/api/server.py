@@ -2,13 +2,22 @@
 Flask服务器
 提供获取地图数据的API
 """
-from flask import Flask, jsonify, send_from_directory
+from flask import Flask, jsonify, send_from_directory, request
 import json
 import os
 import time
+import sys
+import math
+
+# 确保可以导入src模块
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 # 创建Flask应用
 app = Flask(__name__, static_folder='../frontend')
+
+# 全局变量，在启动服务器时加载
+# 加载的Graph对象，用于空间查询
+GRAPH = None
 
 @app.route('/api/map-data')
 def get_map_data():
@@ -200,6 +209,78 @@ def get_map_overview():
         print(error_traceback)
         return jsonify({"error": str(e), "traceback": error_traceback}), 500
 
+@app.route('/api/nearby_nodes')
+def get_nearby_nodes():
+    """
+    提供获取附近节点的API端点
+    根据给定的x和y坐标，返回附近的n个顶点
+    """
+    try:
+        # 解析请求参数
+        x = float(request.args.get('x', 0))
+        y = float(request.args.get('y', 0))
+        count = int(request.args.get('count', 100))
+        
+        print(f"收到附近节点查询请求: x={x}, y={y}, count={count}")
+        
+        # 确保全局图对象已初始化
+        global GRAPH
+        if GRAPH is None:
+            return jsonify({"error": "图数据尚未加载完成，请稍后再试"}), 500
+        
+        # 查询附近的顶点
+        print(f"正在查询附近的 {count} 个顶点...")
+        start_time = time.time()
+        nearby_vertices = GRAPH.get_nearby_vertices(x, y, n=count)
+        query_time = time.time() - start_time
+        print(f"查询完成，耗时 {query_time:.4f} 秒，找到 {len(nearby_vertices)} 个顶点")
+        
+        # 转换为JSON格式
+        result_nodes = []
+        result_edges = []
+        
+        # 收集顶点ID，用于后续查找边
+        vertex_ids = set()
+        
+        # 处理顶点
+        for vertex in nearby_vertices:
+            vertex_ids.add(vertex.id)
+            result_nodes.append({
+                "id": vertex.id,
+                "label": f"Node {vertex.id}",
+                "x": vertex.x,
+                "y": vertex.y
+            })
+        
+        # 查找这些顶点之间的边
+        for vertex in nearby_vertices:
+            for edge in vertex.edges:
+                # 只添加两端都在结果集中的边
+                if edge.vertex1.id in vertex_ids and edge.vertex2.id in vertex_ids:
+                    # 避免重复添加边
+                    edge_id = f"{min(edge.vertex1.id, edge.vertex2.id)}_{max(edge.vertex1.id, edge.vertex2.id)}"
+                    if not any(e.get('id') == edge_id for e in result_edges):
+                        result_edges.append({
+                            "id": edge_id,
+                            "source": edge.vertex1.id,
+                            "target": edge.vertex2.id
+                        })
+        
+        # 构建返回结果
+        result = {
+            "nodes": result_nodes,
+            "edges": result_edges
+        }
+        
+        print(f"返回 {len(result_nodes)} 个节点和 {len(result_edges)} 条边")
+        return jsonify(result)
+    except Exception as e:
+        import traceback
+        error_traceback = traceback.format_exc()
+        print(f"处理附近节点请求时出错: {str(e)}")
+        print(error_traceback)
+        return jsonify({"error": str(e), "traceback": error_traceback}), 500
+
 @app.route('/')
 def index():
     """提供前端页面"""
@@ -221,6 +302,45 @@ def run_server(host='127.0.0.1', port=5000, debug=True):
     """
     # 确保数据目录存在
     os.makedirs(os.path.join(os.path.dirname(__file__), '..', '..', 'data'), exist_ok=True)
+    
+    # 初始化全局图对象
+    global GRAPH
+    try:
+        from src.models.graph import Graph
+        from src.models.vertex import Vertex
+        from src.models.edge import Edge
+        
+        print("服务器启动: 正在加载地图数据...")
+        data_file = os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'map_data.json')
+        with open(data_file, 'r', encoding='utf-8') as f:
+            map_data = json.load(f)
+        
+        # 构建图对象
+        start_time = time.time()
+        GRAPH = Graph()
+        
+        # 添加顶点
+        vertex_map = {}
+        for node in map_data.get('nodes', []):
+            vertex = GRAPH.create_vertex(float(node['x']), float(node['y']))
+            vertex_map[node['id']] = vertex
+        
+        # 添加边
+        for edge in map_data.get('edges', []):
+            source_id = edge.get('source')
+            target_id = edge.get('target')
+            if source_id in vertex_map and target_id in vertex_map:
+                GRAPH.create_edge(vertex_map[source_id], vertex_map[target_id])
+        
+        # 构建空间索引
+        GRAPH.build_spatial_index()
+        load_time = time.time() - start_time
+        print(f"地图数据加载完成，耗时 {load_time:.2f} 秒，共 {len(GRAPH.vertices)} 个顶点和 {len(GRAPH.edges)} 条边")
+    except Exception as e:
+        import traceback
+        print(f"图数据加载失败: {str(e)}")
+        print(traceback.format_exc())
+        print("服务器将继续启动，但空间查询功能可能不可用")
     
     # 启动服务器
     print(f"启动Flask服务器: http://{host}:{port}")

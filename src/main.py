@@ -8,6 +8,7 @@ import os
 from .models.graph import Graph
 from .models.vertex import Vertex
 from .models.edge import Edge
+from .models.quadtree import QuadTree
 from .generators.random_map import generate_random_points, generate_connected_map
 from .exporters.json_exporter import export_graph_to_json
 from .api.server import run_server
@@ -65,6 +66,69 @@ def test_random_map_generation(n=1000):
     
     return graph
 
+def test_quadtree_performance(graph, num_queries=100):
+    """
+    测试四叉树空间索引的性能
+    
+    参数:
+        graph: 要测试的图
+        num_queries: 要执行的查询次数
+    """
+    print("\n=== 测试四叉树空间索引性能 ===")
+    
+    # 构建四叉树索引
+    start_time = time.time()
+    graph.build_spatial_index()
+    build_time = time.time() - start_time
+    print(f"四叉树构建完成，用时 {build_time:.4f} 秒")
+    
+    # 生成随机查询点
+    query_points = [(random.uniform(0, 1000), random.uniform(0, 1000)) for _ in range(num_queries)]
+    
+    # 测试暴力方法
+    start_time = time.time()
+    for x, y in query_points:
+        # 临时禁用空间索引
+        temp_index = graph.spatial_index
+        graph.spatial_index = None
+        _ = graph.get_nearby_vertices(x, y, n=10)
+        # 恢复空间索引
+        graph.spatial_index = temp_index
+    brute_force_time = time.time() - start_time
+    print(f"暴力方法执行 {num_queries} 次查询，用时 {brute_force_time:.4f} 秒")
+    
+    # 测试四叉树方法
+    start_time = time.time()
+    for x, y in query_points:
+        _ = graph.get_nearby_vertices(x, y, n=10)
+    quadtree_time = time.time() - start_time
+    print(f"四叉树方法执行 {num_queries} 次查询，用时 {quadtree_time:.4f} 秒")
+    
+    # 计算性能提升
+    speedup = brute_force_time / quadtree_time if quadtree_time > 0 else float('inf')
+    print(f"性能提升: {speedup:.2f}x")
+    
+    # 验证两种方法的结果一致性
+    test_point = (500, 500)
+    x, y = test_point
+    
+    # 使用暴力方法
+    graph.spatial_index = None
+    brute_force_results = graph.get_nearby_vertices(x, y, n=10)
+    
+    # 使用四叉树
+    graph.spatial_index = temp_index
+    quadtree_results = graph.get_nearby_vertices(x, y, n=10)
+    
+    # 计算结果差异
+    brute_force_ids = {v.id for v in brute_force_results}
+    quadtree_ids = {v.id for v in quadtree_results}
+    difference = brute_force_ids.symmetric_difference(quadtree_ids)
+    
+    print(f"结果一致性检查 - 差异顶点数: {len(difference)}")
+    if difference:
+        print("注意: 两种方法可能在距离相等的顶点上有排序差异")
+
 def export_and_serve_map(graph, data_path=None, run_web_server=True):
     """
     导出地图数据并运行Web服务器
@@ -99,10 +163,13 @@ def main():
     
     # 测试小规模地图生成（为了前端渲染效率，使用较小的规模）
     print("\n\n测试生成10000个点的地图")
-    graph = test_random_map_generation(n=10000)
+    graph = test_random_map_generation(n=1000)
     
     # 检查实际生成的点数
     print(f"实际生成的点数: {len(graph.vertices)}")
+    
+    # 测试四叉树性能
+    test_quadtree_performance(graph, num_queries=50)
     
     # 清理并导出数据
     import os

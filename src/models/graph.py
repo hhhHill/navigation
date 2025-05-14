@@ -3,6 +3,7 @@
 """
 import math
 from collections import defaultdict
+from .quadtree import QuadTree
 
 class Graph:
     """
@@ -33,6 +34,11 @@ class Graph:
             添加的顶点
         """
         self.vertices[vertex.id] = vertex
+        
+        # 如果存在空间索引，则添加到索引中
+        if self.spatial_index:
+            self.spatial_index.insert(vertex)
+            
         return vertex
     
     def create_vertex(self, x, y):
@@ -135,6 +141,33 @@ class Graph:
                 return edge
         return None
     
+    def build_spatial_index(self):
+        """
+        构建空间索引，用于快速查找顶点
+        """
+        if not self.vertices:
+            return
+        
+        # 确定图的边界
+        x_values = [v.x for v in self.vertices.values()]
+        y_values = [v.y for v in self.vertices.values()]
+        
+        x_min, x_max = min(x_values), max(x_values)
+        y_min, y_max = min(y_values), max(y_values)
+        
+        # 为了确保边界包含所有点，增加一点边距
+        padding = max((x_max - x_min), (y_max - y_min)) * 0.01
+        boundary = (x_min - padding, y_min - padding, x_max + padding, y_max + padding)
+        
+        # 创建四叉树
+        self.spatial_index = QuadTree(boundary)
+        
+        # 将所有顶点插入四叉树
+        for vertex in self.vertices.values():
+            self.spatial_index.insert(vertex)
+        
+        return self.spatial_index
+    
     def get_nearby_vertices(self, x, y, n=100):
         """
         获取距离指定坐标最近的n个顶点
@@ -147,7 +180,29 @@ class Graph:
         返回:
             顶点列表，按距离排序
         """
-        # 计算所有顶点到指定坐标的距离
+        # 如果没有空间索引，则构建一个
+        if not self.spatial_index:
+            self.build_spatial_index()
+        
+        # 使用空间索引进行快速查询
+        if self.spatial_index:
+            # 先获取一个合理的查询范围
+            # 使用当前的最大边界对角线长度作为初始查询半径
+            boundary = self.spatial_index.boundary
+            x_min, y_min, x_max, y_max = boundary
+            max_dist = math.sqrt((x_max - x_min) ** 2 + (y_max - y_min) ** 2)
+            initial_radius = max_dist / 10  # 初始半径设为地图对角线的1/10
+            
+            # 递增查询半径直到找到足够的顶点
+            nearby = []
+            radius = initial_radius
+            while len(nearby) < n and radius <= max_dist:
+                nearby = self.spatial_index.query_nearest(x, y, max_count=n, max_distance=radius)
+                radius *= 2  # 每次查询半径翻倍
+            
+            return nearby
+        
+        # 如果没有空间索引，则使用暴力方法计算所有顶点到指定坐标的距离
         distances = []
         for vertex in self.vertices.values():
             dist = ((vertex.x - x) ** 2 + (vertex.y - y) ** 2) ** 0.5
