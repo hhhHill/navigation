@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sigma.js CDN Example</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden; /* Prevent scrollbars */
+        }
+        #container {
+            width: 100%;
+            height: 100%;
+            /* Remove or adjust border if not desired for full screen */
+            /* border: 1px solid black; */
+        }
+
+        #clusterButton {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 10; /* Make sure button is above the sigma container */
+            padding: 10px;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <!-- 图形容器 -->
+    <div id="container"></div>
+
+    <!-- 集群测试按钮 -->
+    <button id="clusterButton">Cluster Nodes</button>
+
+    <!-- 引入 Sigma.js CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sigma.js/1.2.1/sigma.min.js"></script>
+
+    <script>
+        // 等待页面加载完毕
+        document.addEventListener('DOMContentLoaded', function() {
+            // 创建一个 Sigma 实例
+            var s = new sigma({
+                graph: {
+                    nodes: [],
+                    edges: []
+                },
+                container: 'container', // 容器元素的 ID
+                settings: {
+                    defaultNodeColor: '#66ccff',
+                }
+            });
+
+        
+            // 从本地JSON文件加载数据
+            fetch('map_data.json')
+                .then(response => response.json())
+                .then(data => {
+                    // 添加节点
+                    data.nodes.forEach(node => {
+                        s.graph.addNode(node);
+                    });
+                    // 添加边
+                    data.edges.forEach(edge => {
+                        s.graph.addEdge(edge);
+                    });
+
+                    // 获取按钮元素
+                    const clusterButton = document.getElementById('clusterButton');
+
+                    // 为按钮添加点击事件监听器
+                    clusterButton.addEventListener('click', function() {
+                        // 选择一些节点进行集群（这里根据ID示例）
+                        const nodesToCluster = ['0', '1', '2', '3','4']; // 替换为您map_data.json中的实际节点ID
+
+                        // 记录开始时间
+                        const startTime = performance.now();
+
+                        nodesToCluster.forEach(nodeId => {
+                            const node = s.graph.nodes(nodeId);
+                            if (node) {
+                                // 改变节点的颜色来模拟集群
+                                node.color = '#ff6666'; // 设置一个不同的颜色，例如红色
+                            }
+                        });
+
+                        // 记录结束时间
+                        const endTime = performance.now();
+
+                        // 计算并输出耗时
+                        const duration = endTime - startTime;
+                        console.log(`Clustering simulation took: ${duration.toFixed(2)} ms`);
+
+                        // 绘制图表
+                        s.refresh();
+                    });
+
+                    // 绘制图表
+                    s.refresh();
+                })
+                .catch(error => {
+                    console.error('Error loading the graph data:', error);
+                });
+
+            // 绘制图表
+            // s.refresh();
+        });
+    </script>
+</body>
+</html>

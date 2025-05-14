@@ -98,13 +98,23 @@ def main():
     
     
     # 测试小规模地图生成（为了前端渲染效率，使用较小的规模）
-    graph = test_random_map_generation(n=100)
+    print("\n\n测试生成10000个点的地图")
+    graph = test_random_map_generation(n=10000)
+    
+    # 检查实际生成的点数
+    print(f"实际生成的点数: {len(graph.vertices)}")
+    
+    # 清理并导出数据
+    import os
+    data_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'data', 'map_data.json')
+    # 如果文件存在，先删除
+    if os.path.exists(data_path):
+        print(f"删除旧的数据文件: {data_path}")
+        os.remove(data_path)
     
     # 导出数据并启动服务器
     print("\n准备导出地图数据并启动Web服务...")
-    export_and_serve_map(graph)
-    
-    # 注意：服务器启动后，主程序会阻塞在这里
-    
+    export_and_serve_map(graph, data_path=data_path)
+
 if __name__ == "__main__":
     main() 

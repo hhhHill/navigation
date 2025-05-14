@@ -4,7 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>导航系统地图渲染</title>
-  <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/sigma.js/2.4.0/sigma.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/graphology/0.25.4/graphology.umd.min.js"></script>
   <style>
     body, html {
       margin: 0;
@@ -34,55 +35,51 @@
 
   <script>
     // 地图渲染函数
-    function renderMap(data) {
-      // 创建一个network容器
+    function renderMap(detailData, overviewData) {
+      console.time('总渲染时间');
+      
+      // 创建一个container容器
       const container = document.getElementById("map-container");
       
-      // 准备数据
-      const nodes = new vis.DataSet(data.nodes);
-      const edges = new vis.DataSet(data.edges);
+      // 创建graphology图实例
+      const graph = new graphology.Graph();
       
-      // 创建网络图配置
-      const options = {
-        physics: {
-          enabled: false  // 禁用物理引擎，保持节点位置固定
-        },
-        nodes: {
-          shape: "circle",
-          size: 1,
-          font: {
-            size: 1,
-            color: "#66ccff"
-          },
-          borderWidth: 2,
-          color: {
-            border: "#66ccff",
-            background: "#66ccff"
-          }
-        },
-        edges: {
-          width: 2,
-          color: {
-            color: "#848484",
-            highlight: "#FF0000"
-          }
+      // 添加节点
+      detailData.nodes.forEach(node => {
+        graph.addNode(node.id, {
+          label: node.label || `Node ${node.id}`,
+          x: node.x,
+          y: node.y,
+          size: 10,
+          color:  "#66ccff"
+        });
+      });
+      
+      // 添加边
+      detailData.edges.forEach(edge => {
+        if (edge.source === undefined || edge.target === undefined) {
+          console.warn("跳过边，缺少source或target:", edge);
+          return;
         }
-      };
+        
+        const source = edge.source;
+        const target = edge.target;
+        
+        graph.addEdge(source, target, {
+          size: 1,
+          color: "#848484"
+        });
+      });
       
-      // 创建网络图
-      const network = new vis.Network(container, { nodes, edges }, options);
-      
-      // 用于存储创建的集群ID
-      let clusterIds = [];
-      
-      // 记录当前是否已经集群化
-      let isClustered = false;
-      
-      // 集群距离阈值（单位：像素）
-      const clusterDistanceThreshold = 50;
-      
-      // 添加缩放事件监听
-      let currentScale = network.getScale();
+      // 创建Sigma实例
+      const renderer = new Sigma(graph, container, {
+        // 渲染设置
+        renderEdgeLabels: false,
+        minCameraRatio: 0.2,
+        maxCameraRatio: 5,
+        defaultNodeColor: "#66ccff",
+        defaultEdgeColor: "#848484"
+      });
       
       // 创建一个提示元素，提示当前的缩放比例
       const scaleInfo = document.createElement('div');
@@ -97,114 +94,132 @@
       scaleInfo.style.zIndex = '1000';
       container.appendChild(scaleInfo);
       
-      // 根据距离对节点进行集群
-      function clusterByDistance() {
-        if (isClustered) return; // 如果已经集群化，不再重复执行
-        
-        // 获取所有节点的位置
-        const positions = network.getPositions();
-        const nodeIds = nodes.getIds();
-        
-        // 用于标记已经被集群的节点
-        const clusteredNodes = new Set();
-        
-        // 遍历所有节点对，检查距离
-        for (let i = 0; i < nodeIds.length; i++) {
-          const nodeId1 = nodeIds[i];
-          
-          // 如果节点已经被集群，跳过
-          if (clusteredNodes.has(nodeId1)) continue;
-          
-          const pos1 = positions[nodeId1];
-          if (!pos1) continue;
-          
-          // 该节点的集群成员
-          const clusterMembers = [nodeId1];
-          
-          for (let j = i + 1; j < nodeIds.length; j++) {
-            const nodeId2 = nodeIds[j];
-            
-            // 如果节点已经被集群，跳过
-            if (clusteredNodes.has(nodeId2)) continue;
-            
-            const pos2 = positions[nodeId2];
-            if (!pos2) continue;
-            
-            // 计算两个节点之间的距离
-            const distance = Math.sqrt(
-              Math.pow(pos1.x - pos2.x, 2) + Math.pow(pos1.y - pos2.y, 2)
-            );
-            
-            // 如果距离小于阈值，将第二个节点添加到集群成员中
-            if (distance < clusterDistanceThreshold) {
-              clusterMembers.push(nodeId2);
-            }
-          }
-          
-          // 如果集群中有多个节点，创建集群
-          if (clusterMembers.length > 1) {
-            const clusterId = 'cluster_' + nodeId1;
-            
-            // 使用vis.js的集群API创建集群
-            const clusterOptions = {
-              joinCondition: function(nodeOptions) {
-                return clusterMembers.includes(nodeOptions.id);
-              },
-              processProperties: function(clusterOptions, childNodes) {
-                // 计算集群的属性，例如标签
-                clusterOptions.label = '集群 (' + childNodes.length + ' 个节点)';
-                return clusterOptions;
-              },
-              clusterNodeProperties: {
-                id: clusterId,
-                borderWidth: 3,
-                shape: 'dot',
-                color: '#66ccff',
-                size: 10,
-                font: { size: 14 }
-              }
-            };
-            
-            network.cluster(clusterOptions);
-            
-            // 存储集群ID
-            clusterIds.push(clusterId);
-            
-            // 标记这些节点已经被集群
-            clusterMembers.forEach(id => clusteredNodes.add(id));
-          }
-        }
-        
-        isClustered = true;
-        console.log("已创建集群:", clusterIds.length);
-      }
+      // 模式切换状态
+      let currentMode = 'detail'; // 'detail' 或 'overview'
+      let detailNodes = detailData.nodes;
+      let detailEdges = detailData.edges;
+      let overviewNodes = overviewData.nodes;
+      let overviewEdges = overviewData.edges;
       
-      // 打开所有集群
-      function openAllClusters() {
-        if (!isClustered) return; // 如果没有集群，不执行操作
+      // 定义切换到概览模式的函数
+      function switchToOverviewMode() {
+        console.time('切换到概览模式');
         
-        // 打开所有存储的集群
-        clusterIds.forEach(clusterId => {
-          try {
-            network.openCluster(clusterId);
-          } catch (e) {
-            console.log("无法打开集群:", clusterId, e);
-          }
+        // 清空图
+        graph.clear();
+        
+        // 添加概览节点
+        overviewNodes.forEach(node => {
+          graph.addNode(node.id, {
+            label: node.label || `Cluster ${node.id}`,
+            x: node.x,
+            y: node.y,
+            size: node.size || (node.weight ? node.weight * 0.1 : 0.5),  // 使用权重作为大小
+            color: node.color || "#ff6666"
+          });
         });
         
-        // 清空集群ID数组
-        clusterIds = [];
-        isClustered = false;
-        console.log("已打开所有集群");
+              // 添加概览边
+      overviewEdges.forEach(edge => {
+        try {
+          // 使用nullish合并运算符(??)而不是逻辑或(||)，以正确处理0值
+          const source = edge.source !== undefined ? edge.source : edge.from;
+          const target = edge.target !== undefined ? edge.target : edge.to;
+          
+          if (source === undefined || target === undefined) {
+            console.warn("跳过边，缺少source或target:", edge);
+            return;
+          }
+          
+          graph.addEdge(source, target, {
+            size: edge.size || 0.1,
+            color: edge.color || "#848484"
+          });
+        } catch (e) {
+          console.error("添加边时出错:", e, edge);
+        }
+      });
+        
+        currentMode = 'overview';
+        renderer.refresh();
+        console.timeEnd('切换到概览模式');
+        console.log('已切换到概览模式，显示集群节点');
       }
       
-      // 监听缩放事件
-      network.on("zoom", function(params) {
-        currentScale = network.getScale();
-        const percentage = Math.round(currentScale * 100);
+      // 定义切换到详细模式的函数
+      function switchToDetailMode() {
+        console.time('切换到详细模式');
+        
+        // 清空图
+        graph.clear();
+        
+        // 添加详细节点
+        detailNodes.forEach(node => {
+          graph.addNode(node.id, {
+            label: node.label || `Node ${node.id}`,
+            x: node.x,
+            y: node.y,
+            size:  1,
+            color:  "#66ccff"
+          });
+        });
+        
+              // 添加详细边
+      detailEdges.forEach(edge => {
+        try {
+          // 使用nullish合并运算符(??)而不是逻辑或(||)，以正确处理0值
+          const source = edge.source !== undefined ? edge.source : edge.from;
+          const target = edge.target !== undefined ? edge.target : edge.to;
+          
+          if (source === undefined || target === undefined) {
+            console.warn("跳过边，缺少source或target:", edge);
+            return;
+          }
+          
+          graph.addEdge(source, target, {
+            size:  1,
+            color: "#848484"
+          });
+        } catch (e) {
+          console.error("添加边时出错:", e, edge);
+        }
+      });
+        
+        currentMode = 'detail';
+        renderer.refresh();
+        console.timeEnd('切换到详细模式');
+        console.log('已切换到详细模式，显示所有节点');
+      }
+      
+      // Test with a simpler event first
+      renderer.on("clickNode", function(event) {
+        console.log("clickNode event triggered:", event.node, event.event);
+      });
+
+      // 打印所有可用的事件名称
+      console.log("renderer object:", renderer);
+      
+      // 监听相机状态变化事件 - 尝试各种可能的事件名称
+      
+      // 尝试监听"beforeRender"和"afterRender"生命周期事件
+      // renderer.on("beforeRender", function() {
+      //   console.log("beforeRender event triggered - camera ratio:", renderer.getCamera().ratio);
+      // });
+      
+      // renderer.on("afterRender", function() {
+      //   console.log("afterRender event triggered - camera ratio:", renderer.getCamera().ratio);
+      // });
+      
+      // 尝试监听通用的鼠标滚轮事件，这常常用于缩放
+      renderer.on("wheelStage", function(event) {
+        console.log("wheelStage event triggered (likely zoom):", event);
+        
+        const camera = renderer.getCamera();
+        const ratio = camera.ratio;
+        console.log(`Camera ratio after wheel: ${ratio.toFixed(3)}, currentMode = ${currentMode}`);
         
         // 显示当前缩放比例
-        scaleInfo.textContent = `缩放比例: ${percentage}%`;
+        scaleInfo.textContent = `Camera Ratio: ${ratio.toFixed(2)}`;
         scaleInfo.style.display = 'block';
         
         // 3秒后隐藏提示
@@ -213,64 +228,58 @@
           scaleInfo.style.display = 'none';
         }, 3000);
         
-        // 根据缩放比例决定是否进行集群
-        if (percentage <= 80 && !isClustered) {
-          // 缩放小于80%，执行集群操作
-          clusterByDistance();
-        } else if (percentage > 80 && isClustered) {
-          // 缩放大于80%，打开所有集群
-          openAllClusters();
-        }
-        
-        // 当缩放比例小于等于50%时，阻止继续缩小
-        if (percentage <= 50 && params.direction === '-') {
-          network.moveTo({
-            scale: 0.5,  // 强制设置为50%
-            animation: {
-              duration: 300,
-              easingFunction: 'easeInOutQuad'
-            }
-          });
-          
-          // 显示警告信息
-          const warningMsg = document.createElement('div');
-          warningMsg.style.position = 'absolute';
-          warningMsg.style.top = '50%';
-          warningMsg.style.left = '50%';
-          warningMsg.style.transform = 'translate(-50%, -50%)';
-          warningMsg.style.padding = '15px';
-          warningMsg.style.backgroundColor = 'rgba(255,0,0,0.7)';
-          warningMsg.style.color = 'white';
-          warningMsg.style.borderRadius = '5px';
-          warningMsg.style.zIndex = '1001';
-          warningMsg.textContent = '已达到最小缩放比例（50%）';
-          container.appendChild(warningMsg);
-          
-          // 2秒后移除警告
-          setTimeout(() => {
-            container.removeChild(warningMsg);
-          }, 2000);
+        // 根据缩放级别切换显示模式
+        const ZOOM_OUT_THRESHOLD_RATIO = 1.6;
+
+        if (ratio >= ZOOM_OUT_THRESHOLD_RATIO && currentMode === 'detail') {
+          console.log(`Condition met: ratio (${ratio.toFixed(3)}) >= ${ZOOM_OUT_THRESHOLD_RATIO} AND currentMode is 'detail'. Switching to overview.`);
+          switchToOverviewMode();
+        } else if (ratio < ZOOM_OUT_THRESHOLD_RATIO && currentMode === 'overview') {
+          console.log(`Condition met: ratio (${ratio.toFixed(3)}) < ${ZOOM_OUT_THRESHOLD_RATIO} AND currentMode is 'overview'. Switching to detail.`);
+          switchToDetailMode();
         }
       });
       
+      // 尝试监听拖动事件，这也会移动相机
+      renderer.on("downStage", function() {
+        console.log("downStage event triggered (drag start)");
+      });
+      
+      renderer.on("clickStage", function() {
+        console.log("clickStage event triggered");
+        console.log("Current camera ratio:", renderer.getCamera().ratio);
+      });
+
       // 移除加载提示
       const loadingElement = document.querySelector(".loading");
       if (loadingElement) {
         loadingElement.remove();
       }
       
+      console.timeEnd('总渲染时间');
       console.log("地图渲染完成");
+      console.log("Sigma renderer object:", renderer); // Log the renderer object
     }
-
+    
     // 获取地图数据
     async function fetchMapData() {
       try {
-        const response = await fetch('/api/map-data');
-        if (!response.ok) {
-          throw new Error(`HTTP error: ${response.status}`);
+        // 从后端获取详细视图数据
+        const detailResponse = await fetch('/api/map-data/detail');
+        if (!detailResponse.ok) {
+          throw new Error(`HTTP error fetching detail data: ${detailResponse.status}`);
         }
-        const data = await response.json();
-        renderMap(data);
+        const detailData = await detailResponse.json();
+        
+        // 从后端获取概览视图数据
+        const overviewResponse = await fetch('/api/map-data/overview');
+        if (!overviewResponse.ok) {
+          throw new Error(`HTTP error fetching overview data: ${overviewResponse.status}`);
+        }
+        const overviewData = await overviewResponse.json();
+        
+        // 将两套数据传递给渲染函数
+        renderMap(detailData, overviewData);
       } catch (error) {
         console.error("获取地图数据失败:", error);
         document.querySelector(".loading").textContent = "加载地图数据失败，请刷新重试";

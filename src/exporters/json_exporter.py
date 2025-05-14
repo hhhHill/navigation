@@ -25,6 +25,7 @@ def graph_to_visjs(graph: Graph) -> dict:
             "label": f"Node {vertex_id}",
             "x": vertex.x,
             "y": vertex.y,
+            "size": 0.5,  # 添加size属性，用于Sigma.js
             "fixed": True
         })
     
@@ -32,8 +33,10 @@ def graph_to_visjs(graph: Graph) -> dict:
     for edge_id, edge in graph.edges.items():
         edges.append({
             "id": f"{edge.vertex1.id}-{edge.vertex2.id}",
-            "from": edge.vertex1.id,
-            "to": edge.vertex2.id,
+            "source": edge.vertex1.id,  # 改为source
+            "target": edge.vertex2.id,  # 改为target
+            "size": 0.1,  # 添加size属性，用于Sigma.js
+
             # 可选：根据拥堵程度设置颜色
             # "color": get_congestion_color(edge.get_congestion_level())
         })
