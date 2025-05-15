@@ -281,6 +281,76 @@ def get_nearby_nodes():
         print(error_traceback)
         return jsonify({"error": str(e), "traceback": error_traceback}), 500
 
+@app.route('/api/quadtree')
+def get_quadtree_data():
+    """
+    提供四叉树结构数据的API端点
+    递归提取四叉树的所有边界矩形，返回给前端用于可视化
+    """
+    try:
+        print("收到四叉树数据请求...")
+        
+        # 确保全局图对象已初始化
+        global GRAPH
+        if GRAPH is None:
+            return jsonify({"error": "图数据尚未加载完成，请稍后再试"}), 500
+        
+        # 确保空间索引已构建
+        if GRAPH.spatial_index is None:
+            GRAPH.build_spatial_index()
+            
+        # 递归提取四叉树中的所有边界矩形
+        boundaries = []
+        
+        def extract_boundaries(quadtree, level=0):
+            """递归提取四叉树的所有边界矩形"""
+            if quadtree is None:
+                return
+                
+            # 添加当前节点的边界
+            x_min, y_min, x_max, y_max = quadtree.boundary
+            boundaries.append({
+                "x_min": x_min,
+                "y_min": y_min,
+                "x_max": x_max,
+                "y_max": y_max,
+                "level": level,
+                "points_count": len(quadtree.points)
+            })
+            
+            # 递归处理子节点
+            if quadtree.divided:
+                extract_boundaries(quadtree.northwest, level + 1)
+                extract_boundaries(quadtree.northeast, level + 1)
+                extract_boundaries(quadtree.southwest, level + 1)
+                extract_boundaries(quadtree.southeast, level + 1)
+        
+        # 开始递归提取边界
+        start_time = time.time()
+        extract_boundaries(GRAPH.spatial_index)
+        process_time = time.time() - start_time
+        
+        print(f"四叉树数据处理完成，耗时 {process_time:.4f} 秒，共 {len(boundaries)} 个边界矩形")
+        
+        # 构建返回结果
+        result = {
+            "boundaries": boundaries,
+            "total_count": len(boundaries)
+        }
+        
+        return jsonify(result)
+    except Exception as e:
+        import traceback
+        error_traceback = traceback.format_exc()
+        print(f"处理四叉树数据请求时出错: {str(e)}")
+        print(error_traceback)
+        return jsonify({"error": str(e), "traceback": error_traceback}), 500
+
+@app.route('/quadtree-viz')
+def quadtree_viz_page():
+    """提供四叉树可视化页面"""
+    return send_from_directory(app.static_folder, 'quadtree_visualization.html')
+
 @app.route('/')
 def index():
     """提供前端页面"""

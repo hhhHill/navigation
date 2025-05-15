@@ -162,8 +162,8 @@ def main():
     
     
     # 测试小规模地图生成（为了前端渲染效率，使用较小的规模）
-    print("\n\n测试生成10000个点的地图")
-    graph = test_random_map_generation(n=1000)
+    print("\n\n测试生成1000个点的地图")
+    graph = test_random_map_generation(n=10000)
     
     # 检查实际生成的点数
     print(f"实际生成的点数: {len(graph.vertices)}")
