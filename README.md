@@ -22,16 +22,23 @@ navigation/
 │   │   ├── random_map.py     # 随机地图生成
 │   │   └── delaunay.py       # Delaunay三角剖分
 │   │
+│   ├── exporters/           
+│   │   ├── json_exporter.py     # 将图转化为json数据并保存到本地目录
+│   │   
+│   ├── frontend/           
+│   │   ├── js/
+│   │   ├── index.html    #前端界面
+│   │
 │   ├── algorithms/           # 算法实现（后续开发）
 │   │
-│   ├── tests/                # 单元测试
-│   │   ├── test_models.py    # 数据模型测试
-│   │   ├── test_utils.py     # 工具类测试
-│   │   └── test_generators.py # 生成器测试
+│   ├── tests/                # 单元测试各项子功能
+│   │   
+│   │   
+│   │   
 │   │
 │   └── main.py               # 主程序
 │
-├── run_tests.py              # 运行测试的脚本
+├── run.py              # 运行测试的脚本
 └── README.md                 # 项目说明
 ```
 
