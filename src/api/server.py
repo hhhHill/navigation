@@ -349,12 +349,12 @@ def get_quadtree_data():
 @app.route('/quadtree-viz')
 def quadtree_viz_page():
     """提供四叉树可视化页面"""
-    return send_from_directory(app.static_folder, 'quadtree_visualization.html')
+    return send_from_directory(os.path.join(app.static_folder, 'html'), 'quadtree.html')
 
 @app.route('/')
 def index():
     """提供前端页面"""
-    return send_from_directory(app.static_folder, 'index.html')
+    return send_from_directory(os.path.join(app.static_folder, 'html'), 'index.html')
 
 @app.route('/<path:path>')
 def static_files(path):

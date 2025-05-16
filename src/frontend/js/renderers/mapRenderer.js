@@ -1,7 +1,7 @@
 /**
  * 地图渲染模块 - 负责处理地图渲染和视图切换
  */
-import { COLORS } from './nodeHandler.js';
+import { COLORS } from '../utils/nodeHandler.js';
 
 /**
  * 初始化地图渲染

@@ -1,10 +1,10 @@
 /**
  * 事件处理模块 - 负责处理各种用户交互事件
  */
-import { fetchNearbyNodesData } from './apiService.js';
+import { fetchNearbyNodesData } from '../api/apiService.js';
 import { highlightNearbyNodes, resetNodeAndEdgeColors } from './nodeHandler.js';
 import { showLoadingMessage, showResultMessage, showErrorMessage, removeElement, updateScaleInfo } from './uiUtils.js';
-import { switchToOverviewMode, switchToDetailMode } from './mapRenderer.js';
+import { switchToOverviewMode, switchToDetailMode } from '../renderers/mapRenderer.js';
 
 /**
  * 初始化事件监听器

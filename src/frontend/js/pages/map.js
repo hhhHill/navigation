@@ -1,10 +1,10 @@
 /**
  * 主模块 - 应用程序入口点
  */
-import { fetchMapData } from './apiService.js';
-import { initMapRender } from './mapRenderer.js';
-import { initEventListeners } from './eventHandlers.js';
-import { createScaleInfo } from './uiUtils.js';
+import { fetchMapData } from '../api/apiService.js';
+import { initMapRender } from '../renderers/mapRenderer.js';
+import { initEventListeners } from '../utils/eventHandlers.js';
+import { createScaleInfo } from '../utils/uiUtils.js';
 
 /**
  * 初始化应用程序

@@ -55,52 +55,56 @@ function highlightNearbyNodes(graph, nodes, edges) {
   // 创建节点ID集合，用于快速查找
   const nodeIdSet = new Set(nodes.map(node => node.id.toString()));
   
-  // 高亮附近节点
+  // 高亮传入的节点
   nodes.forEach(node => {
-    const nodeId = node.id;
+    const nodeId = node.id.toString();
     
     if (graph.hasNode(nodeId)) {
-      // 对附近节点应用新颜色和大小
+      // 如果已存在于图中，修改颜色
       graph.setNodeAttribute(nodeId, "color", COLORS.NEARBY_NODE);
-      graph.setNodeAttribute(nodeId, "size", 5);
-      
-      // 高亮第一个节点（双击的节点）为特殊颜色
-      if (node.id === nodes[0].id) {
-        graph.setNodeAttribute(nodeId, "color", COLORS.SELECTED_NODE);
-        graph.setNodeAttribute(nodeId, "size", 8);
-      }
+      graph.setNodeAttribute(nodeId, "size", (nodeState[nodeId]?.originalSize || 5) * 1.2);
+    } else {
+      // 如果是新节点，添加到图中
+      graph.addNode(nodeId, {
+        label: node.label || `Node ${nodeId}`,
+        x: node.x,
+        y: node.y,
+        size: 6,
+        color: COLORS.NEARBY_NODE
+      });
     }
   });
   
-  // 高亮附近边
+  // 高亮传入的边
   edges.forEach(edge => {
-    const sourceId = edge.source;
-    const targetId = edge.target;
+    const source = edge.source.toString();
+    const target = edge.target.toString();
     
-    // 尝试查找边
-    let graphEdge = null;
-    try {
-      graphEdge = graph.edge(sourceId, targetId);
-    } catch (e) {
-      try {
-        // 有时边的方向可能反转
-        graphEdge = graph.edge(targetId, sourceId);
-      } catch (e2) {
-        // 边不存在，忽略
-        return;
+    // 只处理source和target都在图中的边
+    if (graph.hasNode(source) && graph.hasNode(target)) {
+      const edgeId = graph.edge(source, target) || `${source}-${target}`;
+      
+      if (graph.hasEdge(edgeId)) {
+        // 如果边已存在，修改颜色
+        graph.setEdgeAttribute(edgeId, "color", COLORS.NEARBY_EDGE);
+        graph.setEdgeAttribute(edgeId, "size", (edgeState[edgeId]?.originalSize || 1) * 1.5);
+      } else {
+        // 如果是新边，添加到图中
+        try {
+          graph.addEdge(source, target, {
+            size: 1.5,
+            color: COLORS.NEARBY_EDGE
+          });
+        } catch (e) {
+          console.warn("添加边时出错:", e, edge);
+        }
       }
-    }
-    
-    if (graphEdge) {
-      // 对附近边应用新颜色和大小
-      graph.setEdgeAttribute(graphEdge, "color", COLORS.NEARBY_EDGE);
-      graph.setEdgeAttribute(graphEdge, "size", 2);
     }
   });
 }
 
 /**
- * 重置节点和边的颜色到原始状态
+ * 重置节点和边的颜色
  * @param {Object} graph - graphology图实例
  * @param {Object} renderer - sigma渲染器实例
  */
@@ -110,9 +114,6 @@ function resetNodeAndEdgeColors(graph, renderer) {
     if (nodeState[nodeId]) {
       graph.setNodeAttribute(nodeId, "color", nodeState[nodeId].originalColor || COLORS.ORIGINAL_NODE);
       graph.setNodeAttribute(nodeId, "size", nodeState[nodeId].originalSize || 5);
-    } else {
-      graph.setNodeAttribute(nodeId, "color", COLORS.ORIGINAL_NODE);
-      graph.setNodeAttribute(nodeId, "size", 5);
     }
   });
   
@@ -121,12 +122,14 @@ function resetNodeAndEdgeColors(graph, renderer) {
     if (edgeState[edgeId]) {
       graph.setEdgeAttribute(edgeId, "color", edgeState[edgeId].originalColor || COLORS.ORIGINAL_EDGE);
       graph.setEdgeAttribute(edgeId, "size", edgeState[edgeId].originalSize || 1);
-    } else {
-      graph.setEdgeAttribute(edgeId, "color", COLORS.ORIGINAL_EDGE);
-      graph.setEdgeAttribute(edgeId, "size", 1);
     }
   });
   
+  // 清空状态记录
+  nodeState = {};
+  edgeState = {};
+  
+  // 刷新渲染
   renderer.refresh();
 }
 
