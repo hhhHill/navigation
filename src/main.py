@@ -14,55 +14,97 @@ from .exporters.json_exporter import export_graph_to_json
 from .api.server import run_server
 
 
-def test_random_map_generation(n=1000):
+def test_random_map_generation(n=1000, load_existing=False):
     """
     测试随机地图生成功能
     
     参数:
         n: 要生成的顶点数量
+        load_existing: 是否加载已存在的地图数据，默认为False
     """
-    print(f"\n=== 测试随机地图生成 ({n} 个顶点) ===")
+    if load_existing:
+        print("\n=== 加载已存在的地图数据 ===")
+        
+        # 确保数据目录存在
+        os.makedirs(os.path.join(os.path.dirname(__file__), '..', 'data'), exist_ok=True)
+        
+        # 加载地图数据
+        import json
+        data_file = os.path.join(os.path.dirname(__file__), '..', 'data', 'map_data.json')
+        try:
+            with open(data_file, 'r', encoding='utf-8') as f:
+                map_data = json.load(f)
+            
+            # 创建图对象
+            graph = Graph()
+            
+            # 添加顶点
+            vertex_map = {}
+            for node in map_data.get('nodes', []):
+                vertex = graph.create_vertex(float(node['x']), float(node['y']))
+                vertex_map[node['id']] = vertex
+            
+            # 添加边
+            for edge in map_data.get('edges', []):
+                source_id = edge.get('source')
+                target_id = edge.get('target')
+                if source_id in vertex_map and target_id in vertex_map:
+                    graph.create_edge(vertex_map[source_id], vertex_map[target_id])
+            
+            # 构建空间索引
+            graph.build_spatial_index()
+            
+            print(f"成功加载地图：{len(graph.vertices)}个顶点，{len(graph.edges)}条边")
+            return graph
+            
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            print(f"加载地图失败：{e}")
+            print("将改为生成新地图...")
+            load_existing = False
     
-    # 记录开始时间
-    start_time = time.time()
-    
-    # 生成随机顶点
-    print("生成随机顶点...")
-    vertices = generate_random_points(n=n, x_min=0, y_min=0, x_max=1000, y_max=1000)
-    
-    # 生成连通图
-    print("生成连通图...")
-    graph = generate_connected_map(vertices)
-    
-    # 记录结束时间
-    end_time = time.time()
-    elapsed = end_time - start_time
-    
-    # 输出结果
-    print(f"地图生成完成，用时 {elapsed:.2f} 秒")
-    print(f"图中有 {len(graph.vertices)} 个顶点和 {len(graph.edges)} 条边")
-    print(f"图是否连通: {graph.is_connected()}")
-    
-    # 统计边的拥堵情况
-    congestion_counts = [0, 0, 0, 0, 0]  # 5个拥堵等级的计数
-    for edge in graph.edges.values():
-        congestion_level = edge.get_congestion_level()
-        congestion_counts[congestion_level] += 1
-    
-    print("道路拥堵统计:")
-    print(f"  畅通: {congestion_counts[0]} 条")
-    print(f"  轻微拥堵: {congestion_counts[1]} 条")
-    print(f"  中度拥堵: {congestion_counts[2]} 条")
-    print(f"  严重拥堵: {congestion_counts[3]} 条")
-    print(f"  极度拥堵: {congestion_counts[4]} 条")
-    
-    # 测试空间查询
-    x, y = 500, 500  # 查询中心点
-    nearby = graph.get_nearby_vertices(x, y, n=10)
-    print(f"\n距离点 ({x},{y}) 最近的 10 个顶点:")
-    for i, v in enumerate(nearby):
-        dist = ((v.x - x) ** 2 + (v.y - y) ** 2) ** 0.5
-        print(f"  {i+1}. 顶点 {v.id}: 坐标 ({v.x:.1f}, {v.y:.1f}), 距离 {dist:.1f}")
+    if not load_existing:
+        print(f"\n=== 测试随机地图生成 ({n} 个顶点) ===")
+        
+        # 记录开始时间
+        start_time = time.time()
+        
+        # 生成随机顶点
+        print("生成随机顶点...")
+        vertices = generate_random_points(n=n, x_min=0, y_min=0, x_max=2000, y_max=2000,min_distance=0)
+        
+        # 生成连通图
+        print("生成连通图...")
+        graph = generate_connected_map(vertices)
+        
+        # 记录结束时间
+        end_time = time.time()
+        elapsed = end_time - start_time
+        
+        # 输出结果
+        print(f"地图生成完成，用时 {elapsed:.2f} 秒")
+        print(f"图中有 {len(graph.vertices)} 个顶点和 {len(graph.edges)} 条边")
+        print(f"图是否连通: {graph.is_connected()}")
+        
+        # 统计边的拥堵情况
+        congestion_counts = [0, 0, 0, 0, 0]  # 5个拥堵等级的计数
+        for edge in graph.edges.values():
+            congestion_level = edge.get_congestion_level()
+            congestion_counts[congestion_level] += 1
+        
+        print("道路拥堵统计:")
+        print(f"  畅通: {congestion_counts[0]} 条")
+        print(f"  轻微拥堵: {congestion_counts[1]} 条")
+        print(f"  中度拥堵: {congestion_counts[2]} 条")
+        print(f"  严重拥堵: {congestion_counts[3]} 条")
+        print(f"  极度拥堵: {congestion_counts[4]} 条")
+        
+        # 测试空间查询
+        x, y = 500, 500  # 查询中心点
+        nearby = graph.get_nearby_vertices(x, y, n=10)
+        print(f"\n距离点 ({x},{y}) 最近的 10 个顶点:")
+        for i, v in enumerate(nearby):
+            dist = ((v.x - x) ** 2 + (v.y - y) ** 2) ** 0.5
+            print(f"  {i+1}. 顶点 {v.id}: 坐标 ({v.x:.1f}, {v.y:.1f}), 距离 {dist:.1f}")
     
     return graph
 
@@ -159,11 +201,10 @@ def main():
     print("导航系统 - 阶段1和阶段2测试")
     print("------------------------------")
     
-    
-    
     # 测试小规模地图生成（为了前端渲染效率，使用较小的规模）
-    print("\n\n测试生成1000个点的地图")
-    graph = test_random_map_generation(n=1000)
+    print("\n\n测试加载或生成地图")
+    # 加载已存在的地图，如果加载失败则生成新地图
+    graph = test_random_map_generation(n=10000, load_existing=True)
     
     # 检查实际生成的点数
     print(f"实际生成的点数: {len(graph.vertices)}")
@@ -172,9 +213,8 @@ def main():
     test_quadtree_performance(graph, num_queries=50)
     
     # 清理并导出数据
-    import os
     data_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'data', 'map_data.json')
-    # 如果文件存在，先删除
+    # 如果文件存在 ，先删除
     if os.path.exists(data_path):
         print(f"删除旧的数据文件: {data_path}")
         os.remove(data_path)

@@ -8,7 +8,7 @@ from ..models.vertex import Vertex
 from ..models.edge import Edge
 from .delaunay import create_delaunay_triangulation
 
-def generate_random_points(n=10000, x_min=0, y_min=0, x_max=1000, y_max=1000, min_distance=1.0):
+def generate_random_points(n=10000, x_min=0, y_min=0, x_max=10000, y_max=10000, min_distance=0):
     """
     生成随机分布的点集
     

@@ -16,7 +16,7 @@ async function fetchMapData() {
       const detailData = await detailResponse.json();
       
       // 从后端获取概览视图数据
-      const overviewResponse = await fetch('/api/map-data/overview');
+      const overviewResponse = await fetch('/api/dbscan_clusters');
       if (!overviewResponse.ok) {
         throw new Error(`HTTP error fetching overview data: ${overviewResponse.status}`);
       }
@@ -29,6 +29,42 @@ async function fetchMapData() {
       throw error;
     }
   }
+
+/**
+ * 获取指定缩放等级的聚类数据
+ * @param {number} zoomLevel - 缩放等级(0.1-5)
+ * @returns {Promise<Object>} 包含节点和边的聚类数据
+ */
+async function fetchZoomClusterData(zoomLevel) {
+  try {
+    // 将浮点数缩放等级转换为最接近的预计算缩放等级
+    const zoomLevels = [0.1, 0.2, 0.5, 1.0, 2.0, 5.0];
+    let closestZoomLevel = zoomLevels[0];
+    let minDiff = Math.abs(zoomLevel - zoomLevels[0]);
+    
+    for (let i = 1; i < zoomLevels.length; i++) {
+      const diff = Math.abs(zoomLevel - zoomLevels[i]);
+      if (diff < minDiff) {
+        minDiff = diff;
+        closestZoomLevel = zoomLevels[i];
+      }
+    }
+    
+    console.log(`获取缩放等级 ${zoomLevel} 的聚类数据 (映射到 ${closestZoomLevel})`);
+    
+    // 使用查询参数获取缩放等级数据
+    const response = await fetch(`/api/zoom_clusters?zoom_level=${zoomLevel}`);
+    if (!response.ok) {
+      throw new Error(`HTTP error fetching zoom cluster data: ${response.status}`);
+    }
+    const clusterData = await response.json();
+    
+    return clusterData;
+  } catch (error) {
+    console.error(`获取缩放等级 ${zoomLevel} 的聚类数据失败:`, error);
+    throw error;
+  }
+}
 
 /**
  * 获取附近节点数据
@@ -66,4 +102,4 @@ async function fetchQuadtreeData() {
     }
 }
 
-export { fetchMapData, fetchNearbyNodesData,fetchQuadtreeData }; 
+export { fetchMapData, fetchNearbyNodesData, fetchQuadtreeData, fetchZoomClusterData }; 
