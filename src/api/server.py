@@ -363,7 +363,13 @@ def get_zoom_clusters():
         # 检查是否有预计算的数据
         if ZOOM_LEVEL_CLUSTERS is None or zoom_level not in ZOOM_LEVEL_CLUSTERS:
             # 尝试找到最接近的缩放等级
-            zoom_levels = [ 0.5, 1.0]
+            zoom_levels = list(ZOOM_LEVEL_CLUSTERS.keys()) if ZOOM_LEVEL_CLUSTERS else [0.3, 0.5, 1.0]
+            
+            # 处理特殊情况：如果缩放等级小于等于0.2，使用0.3的聚类数据
+            if zoom_level <= 0.2 and 0.3 in ZOOM_LEVEL_CLUSTERS:
+                print(f"缩放等级 {zoom_level} 小于等于0.2，使用0.3的聚类数据")
+                return jsonify(ZOOM_LEVEL_CLUSTERS[0.3])
+            
             closest_level = min(zoom_levels, key=lambda x: abs(x - zoom_level))
             
             if closest_level in ZOOM_LEVEL_CLUSTERS:

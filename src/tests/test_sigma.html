@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Sigma.js CDN Example</title>
+    <title>Sigma.js 2.4.0 示例</title>
     <style>
         html, body {
             margin: 0;
@@ -25,86 +25,227 @@
             padding: 10px;
             font-size: 16px;
         }
+        
+        #resetButton {
+            position: absolute;
+            top: 10px;
+            left: 150px;
+            z-index: 10;
+            padding: 10px;
+            font-size: 16px;
+        }
+        
+        .button-group {
+            position: absolute;
+            top: 60px;
+            left: 10px;
+            z-index: 10;
+        }
+        
+        .reset-method {
+            display: block;
+            margin: 5px 0;
+            padding: 8px;
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
     <!-- 图形容器 -->
     <div id="container"></div>
 
-    <!-- 集群测试按钮 -->
-    <button id="clusterButton">Cluster Nodes</button>
+    <!-- 控制按钮 -->
+    <button id="clusterButton">集群节点</button>
+    <button id="resetButton">重置视图</button>
+    
+    <!-- 重置方法选项 -->
+    <div class="button-group">
+        <button class="reset-method" id="method1">方法1: 相机重置</button>
+        <button class="reset-method" id="method2">方法2: 计算图中心</button>
+        <button class="reset-method" id="method3">方法3: 动画过渡</button>
+    </div>
 
-    <!-- 引入 Sigma.js CDN -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/sigma.js/1.2.1/sigma.min.js"></script>
+    <!-- 引入 Sigma.js 2.4.0 CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sigma.js/2.4.0/sigma.min.js"></script>
+    <!-- 引入 graphology 库，Sigma.js 2.x 依赖这个库处理图数据 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/graphology/0.25.4/graphology.umd.min.js"></script>
+    <!-- 引入 graphology-layout 库用于布局 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/graphology-layout/0.6.1/graphology-layout.min.js"></script>
+    <!-- 引入随机布局 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/graphology-layout-force/0.2.4/graphology-layout-force.min.js"></script>
 
     <script>
         // 等待页面加载完毕
         document.addEventListener('DOMContentLoaded', function() {
-            // 创建一个 Sigma 实例
-            var s = new sigma({
-                graph: {
-                    nodes: [],
-                    edges: []
-                },
-                container: 'container', // 容器元素的 ID
-                settings: {
-                    defaultNodeColor: '#66ccff',
-                }
-            });
-
-        
+            // 创建图数据结构
+            const graph = new graphology.Graph();
+            
+            // 创建Sigma实例
+            const container = document.getElementById('container');
+            const renderer = new Sigma(graph, container);
+            
+            // 保存初始相机状态
+            let initialCameraState = null;
+            
             // 从本地JSON文件加载数据
             fetch('map_data.json')
                 .then(response => response.json())
                 .then(data => {
                     // 添加节点
                     data.nodes.forEach(node => {
-                        s.graph.addNode(node);
+                        // 确保节点有必要的属性
+                        graph.addNode(node.id, {
+                            x: node.x || Math.random(),
+                            y: node.y || Math.random(),
+                            size:  5,
+                            color: '#66ccff',
+                            label: node.label || `Node ${node.id}`
+                        });
                     });
+                    
                     // 添加边
                     data.edges.forEach(edge => {
-                        s.graph.addEdge(edge);
+                        // 确保边有必要的属性
+                        graph.addEdge(edge.source, edge.target, {
+                            weight: edge.weight || 1,
+                            color: edge.color || '#ccc'
+                        });
                     });
-
+                    
+                    // 如果节点没有布局信息，应用随机布局
+                    if (!data.nodes.some(node => node.x !== undefined && node.y !== undefined)) {
+                        // 使用随机布局
+                        const settings = forceLayout.inferSettings(graph);
+                        forceLayout.assign(graph, {
+                            settings,
+                            iterations: 100
+                        });
+                        // 稳定布局
+                        forceLayout.inferSettings(graph);
+                    }
+                    
+                    // 保存初始相机状态
+                    initialCameraState = renderer.getCamera().getState();
+                    
                     // 获取按钮元素
                     const clusterButton = document.getElementById('clusterButton');
-
-                    // 为按钮添加点击事件监听器
+                    const resetButton = document.getElementById('resetButton');
+                    const method1Button = document.getElementById('method1');
+                    const method2Button = document.getElementById('method2');
+                    const method3Button = document.getElementById('method3');
+                    
+                    // 集群节点按钮点击事件
                     clusterButton.addEventListener('click', function() {
-                        // 选择一些节点进行集群（这里根据ID示例）
-                        const nodesToCluster = ['0', '1', '2', '3','4']; // 替换为您map_data.json中的实际节点ID
-
+                        // 选择一些节点进行集群
+                        const nodesToCluster = ['0', '1', '2', '3', '4']; // 替换为实际节点ID
+                        
                         // 记录开始时间
                         const startTime = performance.now();
-
+                        
+                        // 改变节点颜色
                         nodesToCluster.forEach(nodeId => {
-                            const node = s.graph.nodes(nodeId);
-                            if (node) {
-                                // 改变节点的颜色来模拟集群
-                                node.color = '#ff6666'; // 设置一个不同的颜色，例如红色
+                            if (graph.hasNode(nodeId)) {
+                                graph.setNodeAttribute(nodeId, 'color', '#ff6666');
                             }
                         });
-
-                        // 记录结束时间
+                        
+                        // 记录结束时间和耗时
                         const endTime = performance.now();
-
-                        // 计算并输出耗时
                         const duration = endTime - startTime;
-                        console.log(`Clustering simulation took: ${duration.toFixed(2)} ms`);
-
-                        // 绘制图表
-                        s.refresh();
+                        console.log(`集群模拟耗时: ${duration.toFixed(2)} ms`);
                     });
-
-                    // 绘制图表
-                    s.refresh();
+                    
+                    // 方法1：使用相机直接重置
+                    method1Button.addEventListener('click', function() {
+                        // 使用 Sigma.js 2.4.0 的相机 API 重置相机
+                        renderer.getCamera().animatedReset();
+                    });
+                    
+                    // 方法2：计算图的中心并重置
+                    method2Button.addEventListener('click', function() {
+                        // 计算图的边界
+                        const nodePositions = graph.nodes().map(nodeId => {
+                            const x = graph.getNodeAttribute(nodeId, 'x');
+                            const y = graph.getNodeAttribute(nodeId, 'y');
+                            return { x, y };
+                        });
+                        
+                        // 找到最小和最大的坐标值
+                        let minX = Math.min(...nodePositions.map(pos => pos.x));
+                        let maxX = Math.max(...nodePositions.map(pos => pos.x));
+                        let minY = Math.min(...nodePositions.map(pos => pos.y));
+                        let maxY = Math.max(...nodePositions.map(pos => pos.y));
+                        
+                        // 计算中心点
+                        const centerX = (minX + maxX) / 2;
+                        const centerY = (minY + maxY) / 2;
+                        
+                        // 计算适当的缩放比例
+                        const width = maxX - minX;
+                        const height = maxY - minY;
+                        const graphRatio = width / height;
+                        const screenRatio = container.offsetWidth / container.offsetHeight;
+                        
+                        // 确定适当的缩放比例
+                        let ratio;
+                        if (graphRatio > screenRatio) {
+                            ratio = width * 1.2 / container.offsetWidth;
+                        } else {
+                            ratio = height * 1.2 / container.offsetHeight;
+                        }
+                        
+                        // 动画过渡到新的相机状态
+                        renderer.getCamera().animate({ 
+                            x: centerX, 
+                            y: centerY, 
+                            ratio: ratio 
+                        }, { 
+                            duration: 500,
+                            easing: 'cubicInOut'  // 使用内置的缓动函数
+                        });
+                    });
+                    
+                    // 方法3：使用内置的动画功能实现平滑过渡
+                    method3Button.addEventListener('click', function() {
+                        // 利用 Sigma.js 2.4.0 的动画 API
+                        // 先计算图的中心
+                        const nodePositions = graph.nodes().map(nodeId => {
+                            const x = graph.getNodeAttribute(nodeId, 'x');
+                            const y = graph.getNodeAttribute(nodeId, 'y');
+                            return { x, y };
+                        });
+                        
+                        const minX = Math.min(...nodePositions.map(pos => pos.x));
+                        const maxX = Math.max(...nodePositions.map(pos => pos.x));
+                        const minY = Math.min(...nodePositions.map(pos => pos.y));
+                        const maxY = Math.max(...nodePositions.map(pos => pos.y));
+                        
+                        const centerX = (minX + maxX) / 2;
+                        const centerY = (minY + maxY) / 2;
+                        
+                        // 使用高级动画选项
+                        renderer.getCamera().animate(
+                            { x: centerX, y: centerY, ratio: 1 }, 
+                            { 
+                                duration: 800,
+                                easing: 'cubicInOut',
+                                onComplete: () => {
+                                    console.log('动画完成!');
+                                }
+                            }
+                        );
+                    });
+                    
+                    // 重置按钮 - 恢复初始相机状态
+                    resetButton.addEventListener('click', function() {
+                        if (initialCameraState) {
+                            renderer.getCamera().animate(initialCameraState, { duration: 300 });
+                        }
+                    });
                 })
                 .catch(error => {
-                    console.error('Error loading the graph data:', error);
+                    console.error('加载图数据时出错:', error);
                 });
-
-            // 绘制图表
-            // s.refresh();
         });
     </script>
 </body>

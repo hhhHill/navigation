@@ -3,8 +3,8 @@
  */
 import { fetchMapData } from '../api/apiService.js';
 import { initMapRender } from '../renderers/mapRenderer.js';
-import { initEventListeners } from '../utils/eventHandlers.js';
-import { createScaleInfo } from '../utils/uiUtils.js';
+import { initEventListeners} from '../utils/eventHandlers.js';
+import { createScaleInfo, createControlButton } from '../utils/uiUtils.js';
 
 /**
  * 初始化应用程序
@@ -22,6 +22,21 @@ async function initApp() {
     
     // 初始化事件监听器
     initEventListeners(mapData);
+    
+    // 创建重置视图按钮
+    createControlButton(
+      mapData.container, 
+      'reset-view-button', 
+      '重置视图', 
+      () => mapData.renderer.getCamera().animatedReset(),
+      { top: '10px', right: '10px', left: 'auto' }
+    );
+    
+    // 阻止地图容器上的滚轮事件默认行为（防止页面滚动）
+    const mapContainer = document.getElementById('map-container');
+    mapContainer.addEventListener('wheel', (event) => {
+      event.preventDefault();
+    }, { passive: false });
     
     // 移除加载提示
     const loadingElement = document.querySelector(".loading");

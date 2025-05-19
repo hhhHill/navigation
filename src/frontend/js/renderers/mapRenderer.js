@@ -21,18 +21,18 @@ function initMapRender(data) {
   
   // 初始化状态
   const state = {
-    currentMode: 'detail',
+    currentMode: 'zoom',  // 默认为缩放模式，不再使用detail模式
     detailNodes: detailData.nodes,
     detailEdges: detailData.edges,
     // 缩放模式相关状态
     currentZoomLevel: null,
-    zoomThresholds: [0.3,0.5, 1.0],
+    zoomThresholds: [0.1, 0.3, 0.5, 1.0],
     zoomData: {}, // 缓存不同缩放等级的数据
-    autoZoom: true // 是否启用自动缩放模式
   };
   
-  // 初始渲染详细视图
-  renderDetailView(graph, state);
+  // 检查节点数量
+  const nodeCount = detailData.nodes.length;
+  console.log(`初始化地图，节点数量: ${nodeCount}`);
   
   // 创建Sigma实例
   const renderer = new Sigma(graph, container, {
@@ -41,18 +41,64 @@ function initMapRender(data) {
     minCameraRatio: 0.1,
     maxCameraRatio: 2,
     defaultNodeColor: COLORS.ORIGINAL_NODE,
-    defaultEdgeColor: COLORS.ORIGINAL_EDGE
+    defaultEdgeColor: COLORS.ORIGINAL_EDGE,
+    // 减小滚轮缩放幅度
+    zoomingRatio: 1,
+    // 禁止摄像机平移（禁止用户拖动网络）
+
   });
   
-  console.timeEnd('总渲染时间');
-  console.log("地图渲染完成");
+  // 获取渲染容器并添加事件监听器以阻止平移
+  const domElement = renderer.getContainer();
   
-  return {
+  // // 阻止鼠标和触摸事件导致的平移
+  // domElement.addEventListener('mousedown', function(e) {
+  //   if (e.button === 0) { // 确保只阻止左键拖动
+  //     e.preventDefault();
+  //     e.stopPropagation();
+  //   }
+  // }, false);
+  
+  // domElement.addEventListener('touchstart', function(e) {
+  //   e.preventDefault();
+  //   e.stopPropagation();
+  // }, false);
+  
+  // // 为了确保平移完全被禁用，也可以阻止mousemove和touchmove事件
+  // domElement.addEventListener('mousemove', function(e) {
+  //   if (e.buttons === 1) { // 如果左键按下并移动
+  //     e.preventDefault();
+  //     e.stopPropagation();
+  //   }
+  // }, false);
+  
+  // domElement.addEventListener('touchmove', function(e) {
+  //   e.preventDefault();
+  //   e.stopPropagation();
+  // }, false);
+  
+  // 包装返回对象
+  const mapData = {
     graph,
     renderer,
     container,
     state
   };
+  
+  // 设置初始缩放比例并立即加载聚类视图
+  console.log("初始化自动缩放模式，设置初始缩放比例为0.2并加载聚类视图");
+  // 设置相机缩放比例为0.2
+  renderer.getCamera().ratio = 0.2;
+  // 初始化后立即加载聚类视图
+  setTimeout(() => {
+    const closestZoomLevel = findClosestZoomLevel(0.2, state.zoomThresholds);
+    switchToZoomLevel(closestZoomLevel, mapData);
+  }, 100);
+  
+  console.timeEnd('总渲染时间');
+  console.log("地图渲染完成");
+  
+  return mapData;
 }
 
 /**
@@ -74,50 +120,6 @@ function findClosestZoomLevel(currentZoom, thresholds) {
   }
   
   return closestZoom;
-}
-
-/**
- * 渲染详细视图
- * @param {Object} graph - graphology图实例
- * @param {Object} state - 当前状态对象
- */
-function renderDetailView(graph, state) {
-  // 清空图
-  graph.clear();
-  
-  // 添加详细节点
-  state.detailNodes.forEach(node => {
-    graph.addNode(node.id, {
-      label: node.label || `Node ${node.id}`,
-      x: node.x,
-      y: node.y,
-      size: 2,
-      color: COLORS.ORIGINAL_NODE
-    });
-  });
-  
-  // 添加详细边
-  state.detailEdges.forEach(edge => {
-    try {
-      const source = edge.source !== undefined ? edge.source : edge.from;
-      const target = edge.target !== undefined ? edge.target : edge.to;
-      
-      if (source === undefined || target === undefined) {
-        console.warn("跳过边，缺少source或target:", edge);
-        return;
-      }
-      
-      graph.addEdge(source, target, {
-        size: 1,
-        color: COLORS.ORIGINAL_EDGE
-      });
-    } catch (e) {
-      console.error("添加边时出错:", e, edge);
-    }
-  });
-  
-  state.currentMode = 'detail';
-  state.currentZoomLevel = null; // 重置缩放等级
 }
 
 /**
@@ -206,6 +208,68 @@ async function switchToZoomLevel(zoomLevel, mapData) {
   try {
     console.time(`切换到缩放等级 ${zoomLevel}`);
     
+    // 新增逻辑：当缩放比例为0.1时，直接渲染原始数据
+    if (zoomLevel === 0.1) {
+      console.log(`缩放等级为 ${zoomLevel}，使用原始数据进行渲染`);
+      
+      // 显示加载指示器
+      document.getElementById("loading-indicator")?.classList.remove("hidden");
+      
+      // 清空图
+      graph.clear();
+      
+      // 使用原始数据中的节点和边
+      if (state.detailNodes && state.detailEdges) {
+        // 添加节点
+        state.detailNodes.forEach(node => {
+          graph.addNode(node.id, {
+            label: node.label || `Node ${node.id}`,
+            x: node.x,
+            y: node.y,
+            size: 3, // 使用较小的节点大小
+            color: node.color || COLORS.ORIGINAL_NODE,
+            cluster_id: node.cluster_id,
+            original: true
+          });
+        });
+        
+        // 添加边
+        state.detailEdges.forEach(edge => {
+          try {
+            const source = edge.source !== undefined ? edge.source : edge.from;
+            const target = edge.target !== undefined ? edge.target : edge.to;
+            
+            if (source === undefined || target === undefined) {
+              console.warn("跳过边，缺少source或target:", edge);
+              return;
+            }
+            
+            graph.addEdge(source, target, {
+              size: edge.size || 0.3,
+              color: edge.color || COLORS.ORIGINAL_EDGE
+            });
+          } catch (e) {
+            console.error("添加边时出错:", e, edge);
+          }
+        });
+        
+        state.currentMode = 'zoom';
+        state.currentZoomLevel = zoomLevel;
+        
+        // 刷新视图
+        renderer.refresh();
+        
+        // 隐藏加载指示器
+        document.getElementById("loading-indicator")?.classList.add("hidden");
+        
+        console.timeEnd(`切换到缩放等级 ${zoomLevel}`);
+        console.log(`已切换到缩放等级 ${zoomLevel}，显示 ${state.detailNodes.length} 个原始节点`);
+        return;
+      } else {
+        console.warn("没有找到原始数据，将使用聚类数据");
+      }
+    }
+    
     // 检查缓存中是否已有该等级的数据
     if (!state.zoomData[zoomLevel]) {
       console.log(`缓存中没有缩放等级 ${zoomLevel} 的数据，正在获取...`);
@@ -235,51 +299,21 @@ async function switchToZoomLevel(zoomLevel, mapData) {
     console.error(`切换到缩放等级 ${zoomLevel} 失败:`, error);
     document.getElementById("loading-indicator")?.classList.add("hidden");
     
-    // 出错时回退到详细视图
-    if (state.currentMode !== 'detail') {
-      renderDetailView(graph, state);
-      renderer.refresh();
+    // 出错时尝试切换到不同的缩放级别
+    if (state.zoomThresholds.includes(zoomLevel)) {
+      const fallbackLevel = state.zoomThresholds.find(level => level !== zoomLevel);
+      if (fallbackLevel && state.zoomData[fallbackLevel]) {
+        console.log(`尝试切换到备用缩放等级 ${fallbackLevel}`);
+        renderZoomView(graph, state, fallbackLevel, state.zoomData[fallbackLevel]);
+        renderer.refresh();
+      }
     }
   }
 }
 
-/**
- * 切换到详细模式
- * @param {Object} mapData - 包含graph、renderer和state的对象
- */
-function switchToDetailMode(mapData) {
-  console.time('切换到详细模式');
-  
-  const { graph, renderer, state } = mapData;
-  renderDetailView(graph, state);
-  
-  renderer.refresh();
-  console.timeEnd('切换到详细模式');
-  console.log('已切换到详细模式，显示所有节点');
-}
 
-/**
- * 切换自动缩放模式
- * @param {Object} mapData - 包含graph、renderer和state的对象
- * @param {boolean} enable - 是否启用自动缩放模式
- */
-function toggleAutoZoomMode(mapData, enable) {
-  const { state, renderer } = mapData;
-  state.autoZoom = enable;
-  
-  console.log(`自动缩放模式已${enable ? '启用' : '禁用'}`);
-  
-  // 如果启用，立即根据当前缩放级别更新视图
-  if (enable) {
-    const currentZoom = renderer.getCamera().ratio;
-    const closestZoomLevel = findClosestZoomLevel(currentZoom, state.zoomThresholds);
-    switchToZoomLevel(closestZoomLevel, mapData);
-  }
-}
 
 export { 
   initMapRender,
-  switchToDetailMode,
   switchToZoomLevel,
-  toggleAutoZoomMode
 }; 

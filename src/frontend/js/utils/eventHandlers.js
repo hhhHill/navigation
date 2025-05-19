@@ -4,7 +4,7 @@
 import { fetchNearbyNodesData } from '../api/apiService.js';
 import { highlightNearbyNodes, resetNodeAndEdgeColors } from './nodeHandler.js';
 import { showLoadingMessage, showResultMessage, showErrorMessage, removeElement, updateScaleInfo } from './uiUtils.js';
-import { switchToDetailMode, switchToZoomLevel, toggleAutoZoomMode } from '../renderers/mapRenderer.js';
+import { switchToZoomLevel} from '../renderers/mapRenderer.js';
 
 /**
  * 初始化事件监听器
@@ -16,6 +16,9 @@ function initEventListeners(mapData) {
   // 初始化双击处理相关变量
   let lastClickTime = 0;
   const doubleClickDelay = 1000; // 毫秒
+  
+  // 禁用相机平移功能
+  renderer.getCamera().enabledPanning = false;
   
   // 点击节点事件（用于双击检测）
   renderer.on("clickNode", function(event) {
@@ -38,33 +41,61 @@ function initEventListeners(mapData) {
     lastClickTime = currentTime;
   });
   
-  // 滚轮事件（用于缩放检测和模式切换）
-  renderer.on("wheelStage", function(event) {
-    const camera = renderer.getCamera();
-    const ratio = camera.ratio;
-    // console.log(`Camera ratio after wheel: ${ratio.toFixed(3)}, currentMode = ${state.currentMode}`);
-    
+  // 处理缩放和视图切换的函数
+  const handleZoomChange = (ratio) => {
     // 更新缩放比例显示
     if (mapData.scaleInfo) {
       updateScaleInfo(mapData.scaleInfo, ratio);
     }
     
-    // 如果启用了自动缩放模式，则根据缩放比例加载相应的聚类数据
-    if (state.autoZoom) {
-      // 找到最接近的预定义缩放等级
-      const closestZoomLevel = findClosestZoomLevel(ratio, state.zoomThresholds);
-      
-      if (ratio <=0.2) {
-        switchToDetailMode(mapData);
-      }
-      // 如果缩放等级发生变化，切换到相应的聚类视图
-      else if (state.currentZoomLevel !== closestZoomLevel) {
-        console.log(`缩放等级变化: ${state.currentZoomLevel} -> ${closestZoomLevel}`);
-        switchToZoomLevel(closestZoomLevel, mapData);
-      }
+    // 特定缩放比例下的额外处理：当缩放非常远时，重置视图
+    if (ratio == 2) {
+      renderer.getCamera().animatedReset();
+      console.log("重置成功");
+      // 在重置视图后，不再执行基于缩放等级的视图切换
+      state.currentZoomLevel = null; // 可选：重置当前缩放等级状态，防止后续小的缩放变化再次触发切换
+      return; // 直接返回，跳过后续的视图切换逻辑
     }
+    
+    // 始终使用自动缩放模式，根据缩放比例加载相应的聚类数据
+    // 找到最接近的预定义缩放等级
+    const closestZoomLevel = findClosestZoomLevel(ratio, state.zoomThresholds);
+    
+    // 如果缩放等级发生变化，切换视图
+    if (state.currentZoomLevel !== closestZoomLevel) {
+      console.log(`缩放等级变化: ${state.currentZoomLevel} -> ${closestZoomLevel}`);
+      switchToZoomLevel(closestZoomLevel, mapData);
+    }
+  };
+  
+  renderer.on("doubleClickStage", function(event) {
+    console.log("双击舞台事件触发");
+    renderer.getCamera().animatedReset();
+    console.log("重置成功");
+          // 尝试阻止默认缩放行为，但这可能不一定有效，取决于Sigma.js的内部实现
+      event.preventDefault();
+      event.stopPropagation();
   });
-
+  // 滚轮事件（用于缩放检测和模式切换）- 在空白区域
+  renderer.on("wheelStage", function(event) {
+    const camera = renderer.getCamera();
+    const ratio = camera.ratio;
+    console.log(`Stage wheel event - Camera ratio: ${ratio.toFixed(3)}`);
+    
+    handleZoomChange(ratio);
+  });
+  
+  // 滚轮事件 - 在节点上
+  renderer.on("wheelNode", function(event) {
+    const camera = renderer.getCamera();
+    const ratio = camera.ratio;
+    console.log(`Node wheel event - Camera ratio: ${ratio.toFixed(3)}, node: ${event.node}`);
+    
+    // 阻止事件冒泡，确保不会同时触发wheelStage
+    event.preventSigmaDefault();
+    
+    handleZoomChange(ratio);
+  });
   
   // 其他事件监听器
   renderer.on("clickStage", function() {
@@ -74,25 +105,22 @@ function initEventListeners(mapData) {
   
   // 添加摄像机更新事件监听（处理拖动等非滚轮引起的缩放变化）
   renderer.on("cameraUpdated", function({ x, y, ratio }) {
-    // 只有在自动缩放模式且非滚轮事件引起的变化才处理
-    // 由于wheelStage会在cameraUpdated之前触发，所以这里不会重复处理滚轮事件
-    if (state.autoZoom) {
-      // 防抖动：当相机位置变化很小时，不触发视图更新
-      if (state.lastCameraRatio && Math.abs(state.lastCameraRatio - ratio) < 0.01) {
-        return;
-      }
-      
-      // 记录当前相机位置
-      state.lastCameraRatio = ratio;
-      
-      // 找到最接近的预定义缩放等级
-      const closestZoomLevel = findClosestZoomLevel(ratio, state.zoomThresholds);
-      
-      // 如果缩放等级发生变化，切换到相应的聚类视图
-      if (state.currentZoomLevel !== closestZoomLevel) {
-        console.log(`相机更新事件: 缩放等级变化 ${state.currentZoomLevel} -> ${closestZoomLevel}`);
-        switchToZoomLevel(closestZoomLevel, mapData);
-      }
+    // 由于自动缩放模式始终启用，处理所有相机更新事件
+    // 防抖动：当相机位置变化很小时，不触发视图更新
+    if (state.lastCameraRatio && Math.abs(state.lastCameraRatio - ratio) < 0.01) {
+      return;
+    }
+    
+    // 记录当前相机位置
+    state.lastCameraRatio = ratio;
+    
+    // 找到最接近的预定义缩放等级
+    const closestZoomLevel = findClosestZoomLevel(ratio, state.zoomThresholds);
+    
+    // 如果缩放等级发生变化，切换到相应的聚类视图
+    if (state.currentZoomLevel !== closestZoomLevel) {
+      console.log(`相机更新事件: 缩放等级变化 ${state.currentZoomLevel} -> ${closestZoomLevel}`);
+      switchToZoomLevel(closestZoomLevel, mapData);
     }
   });
 }
@@ -161,41 +189,5 @@ async function handleNearbyNodesRequest(x, y, count, mapData) {
   }
 }
 
-/**
- * 初始化视图控制按钮
- * @param {Object} mapData - 包含graph、renderer和state的对象
- */
-function initViewControlButtons(mapData) {
-  // 详细视图按钮
-  const detailButton = document.getElementById('detail-view-button');
-  if (detailButton) {
-    detailButton.addEventListener('click', () => {
-      // 禁用自动缩放模式
-      toggleAutoZoomMode(mapData, false);
-      // 切换到详细视图
-      switchToDetailMode(mapData);
-    });
-  }
-  
-  // 自动缩放模式按钮
-  const autoZoomButton = document.getElementById('auto-zoom-button');
-  if (autoZoomButton) {
-    autoZoomButton.addEventListener('click', () => {
-      // 切换自动缩放模式状态
-      const newState = !mapData.state.autoZoom;
-      toggleAutoZoomMode(mapData, newState);
-      
-      // 更新按钮文本
-      autoZoomButton.textContent = newState ? '禁用自动缩放' : '启用自动缩放';
-      
-      // 如果启用了自动缩放，立即应用当前缩放级别
-      if (newState) {
-        const ratio = mapData.renderer.getCamera().ratio;
-        const closestZoomLevel = findClosestZoomLevel(ratio, mapData.state.zoomThresholds);
-        switchToZoomLevel(closestZoomLevel, mapData);
-      }
-    });
-  }
-}
 
-export { initEventListeners, handleNearbyNodesRequest, initViewControlButtons }; 
+export { initEventListeners, handleNearbyNodesRequest }; 

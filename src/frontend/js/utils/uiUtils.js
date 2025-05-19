@@ -116,7 +116,7 @@ function removeElement(elementId) {
  * @param {string} id - 按钮ID
  * @param {string} text - 按钮文本
  * @param {Function} clickHandler - 点击处理函数
- * @param {Object} position - 位置对象，包含top和left属性
+ * @param {Object} position - 位置对象，包含top、left和right属性
  * @returns {HTMLElement} 创建的按钮元素
  */
 function createControlButton(container, id, text, clickHandler, position = { top: '10px', left: '10px' }) {
@@ -125,7 +125,13 @@ function createControlButton(container, id, text, clickHandler, position = { top
   button.className = 'control-button';
   button.textContent = text;
   button.style.top = position.top;
-  button.style.left = position.left;
+  
+  // 支持left和right定位
+  if (position.right !== undefined) {
+    button.style.right = position.right;
+  } else {
+    button.style.left = position.left || '10px';
+  }
   
   button.addEventListener('click', clickHandler);
   
