@@ -48,6 +48,25 @@
             padding: 8px;
             font-size: 14px;
         }
+        
+        #camera-info {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background-color: rgba(255, 255, 255, 0.8);
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+            font-family: monospace;
+            z-index: 10;
+        }
+        
+        .method-selector {
+            position: absolute;
+            top: 10px;
+            right: 20px;
+            z-index: 10;
+        }
     </style>
 </head>
 <body>
@@ -64,6 +83,25 @@
         <button class="reset-method" id="method2">方法2: 计算图中心</button>
         <button class="reset-method" id="method3">方法3: 动画过渡</button>
     </div>
+    
+    <!-- 监听方法选择器 -->
+    <div class="method-selector">
+        <select id="listener-method">
+            <option value="wheel">方法1: DOM wheel事件</option>
+            <option value="mousecaptor">方法2: MouseCaptor事件</option>
+            <option value="polling">方法3: 轮询检测</option>
+            <option value="proxy">方法4: 函数代理</option>
+            <option value="debounce">方法5: 滚轮结束检测</option>
+        </select>
+    </div>
+    
+    <!-- 相机信息显示 -->
+    <div id="camera-info">
+        <div>相机位置: <span id="camera-position">x: 0, y: 0</span></div>
+        <div>缩放比例: <span id="camera-ratio">1.0</span></div>
+        <div>上次更新: <span id="last-update">-</span></div>
+        <div>监听方法: <span id="active-method">-</span></div>
+    </div>
 
     <!-- 引入 Sigma.js 2.4.0 CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/sigma.js/2.4.0/sigma.min.js"></script>
@@ -75,6 +113,16 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/graphology-layout-force/0.2.4/graphology-layout-force.min.js"></script>
 
     <script>
+        // 防抖函数
+        function debounce(func, wait) {
+            let timeout;
+            return function(...args) {
+                const context = this;
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(context, args), wait);
+            };
+        }
+        
         // 等待页面加载完毕
         document.addEventListener('DOMContentLoaded', function() {
             // 创建图数据结构
@@ -84,8 +132,186 @@
             const container = document.getElementById('container');
             const renderer = new Sigma(graph, container);
             
+            // 获取相机信息显示元素
+            const cameraPositionEl = document.getElementById('camera-position');
+            const cameraRatioEl = document.getElementById('camera-ratio');
+            const lastUpdateEl = document.getElementById('last-update');
+            const activeMethodEl = document.getElementById('active-method');
+            const listenerMethodSelect = document.getElementById('listener-method');
+            
             // 保存初始相机状态
             let initialCameraState = null;
+            
+            // 定义事件处理函数 - 确保在使用前先定义
+            window.onWheelEvent = function(e) {
+                // 延迟获取相机状态，因为Sigma处理滚轮事件需要时间
+                setTimeout(updateCameraInfo, 10);
+            };
+            
+            // 更新相机信息的函数
+            function updateCameraInfo() {
+                const camera = renderer.getCamera();
+                const state = camera.getState();
+                
+                cameraPositionEl.textContent = `x: ${state.x.toFixed(2)}, y: ${state.y.toFixed(2)}`;
+                cameraRatioEl.textContent = state.ratio.toFixed(4);
+                lastUpdateEl.textContent = new Date().toLocaleTimeString();
+            }
+            
+            // 清除所有监听器
+            function clearAllListeners() {
+                // 停止轮询
+                if (window._cameraPollingInterval) {
+                    clearInterval(window._cameraPollingInterval);
+                    window._cameraPollingInterval = null;
+                }
+                
+                // 移除DOM滚轮事件 - 确保存在时再移除
+                if (window.onWheelEvent) {
+                    container.removeEventListener('wheel', window.onWheelEvent);
+                }
+                
+                // 移除防抖滚轮事件
+                if (window.onWheelEndEvent) {
+                    container.removeEventListener('wheel', window.onWheelEndEvent);
+                }
+                
+                // 移除MouseCaptor事件
+                try {
+                    if (window._originalWheelFunction) {
+                        // 恢复原始函数
+                        renderer.getMouseCaptor().handleWheel = window._originalWheelFunction;
+                        window._originalWheelFunction = null;
+                    }
+                } catch (e) {
+                    console.error("移除MouseCaptor监听器时出错:", e);
+                }
+            }
+            
+            // 方法1: 使用DOM的wheel事件
+            function setupWheelListener() {
+                clearAllListeners();
+                activeMethodEl.textContent = "DOM wheel事件";
+                
+                // 添加事件监听器
+                container.addEventListener('wheel', window.onWheelEvent);
+            }
+            
+            // 方法2: 使用MouseCaptor的handleWheel方法
+            function setupMouseCaptorListener() {
+                clearAllListeners();
+                activeMethodEl.textContent = "MouseCaptor代理";
+                
+                try {
+                    const mouseCaptor = renderer.getMouseCaptor();
+                    // 保存原始函数
+                    window._originalWheelFunction = mouseCaptor.handleWheel;
+                    
+                    // 覆盖滚轮处理函数
+                    mouseCaptor.handleWheel = function(e) {
+                        // 调用原始函数
+                        window._originalWheelFunction.call(mouseCaptor, e);
+                        
+                        // 更新相机信息
+                        updateCameraInfo();
+                    };
+                } catch (e) {
+                    console.error("设置MouseCaptor监听器时出错:", e);
+                    activeMethodEl.textContent = "MouseCaptor代理 (失败)";
+                }
+            }
+            
+            // 方法3: 使用轮询检测相机变化
+            function setupPollingListener() {
+                clearAllListeners();
+                activeMethodEl.textContent = "轮询检测";
+                console.log("ssssss");
+                // 保存最后一次相机状态
+                let lastState = renderer.getCamera().getState();
+                
+                // 设置定时器，定期检查相机状态
+                window._cameraPollingInterval = setInterval(function() {
+                    const currentState = renderer.getCamera().getState();
+                    
+                    // 如果相机状态改变，更新显示
+                    if (
+                        lastState.x !== currentState.x || 
+                        lastState.y !== currentState.y || 
+                        lastState.ratio !== currentState.ratio
+                    ) {
+                        updateCameraInfo();
+                        lastState = currentState;
+                    }
+                }, 50); // 每50ms检查一次
+            }
+            
+            // 方法4: 代理Camera的setState方法
+            function setupProxyListener() {
+                clearAllListeners();
+                activeMethodEl.textContent = "Camera setState代理";
+                
+                try {
+                    const camera = renderer.getCamera();
+                    
+                    // 保存原始函数
+                    if (!window._originalSetState) {
+                        window._originalSetState = camera.setState;
+                    }
+                    
+                    // 覆盖setState方法
+                    camera.setState = function(state) {
+                        // 调用原始函数
+                        window._originalSetState.call(camera, state);
+                        
+                        // 更新相机信息
+                        updateCameraInfo();
+                    };
+                } catch (e) {
+                    console.error("设置Camera代理时出错:", e);
+                    activeMethodEl.textContent = "Camera setState代理 (失败)";
+                }
+            }
+            
+            // 方法5: 使用防抖检测滚轮结束事件
+            function setupDebounceListener() {
+                clearAllListeners();
+                     // 监听滚轮事件
+            window.addEventListener('wheel', function() {
+            // 清除之前的定时器
+            clearTimeout(timer);
+            
+            // 设置新的定时器，200ms 后认为滚动结束
+            timer = setTimeout(function() {
+                console.log("ssssss");
+                // 自动滚动到底部
+                
+            }, 200);
+        });
+
+            }
+            
+            // 监听方法选择器变化
+            listenerMethodSelect.addEventListener('change', function() {
+                const method = this.value;
+                
+                switch (method) {
+                    case 'wheel':
+                        setupWheelListener();
+                        break;
+                    case 'mousecaptor':
+                        setupMouseCaptorListener();
+                        break;
+                    case 'polling':
+                        setupPollingListener();
+                        break;
+                    case 'proxy':
+                        setupProxyListener();
+                        break;
+                    case 'debounce':
+                        setupDebounceListener();
+                        break;
+                }
+            });
             
             // 从本地JSON文件加载数据
             fetch('map_data.json')
@@ -97,7 +323,7 @@
                         graph.addNode(node.id, {
                             x: node.x || Math.random(),
                             y: node.y || Math.random(),
-                            size:  5,
+                            size: 5,
                             color: '#66ccff',
                             label: node.label || `Node ${node.id}`
                         });
@@ -242,6 +468,12 @@
                             renderer.getCamera().animate(initialCameraState, { duration: 300 });
                         }
                     });
+                    
+                    // 默认启用滚轮结束检测方法
+                    listenerMethodSelect.value = 'debounce';
+                    setupDebounceListener();
+                    
+                    console.log("图形已加载，请使用滚轮缩放来测试相机坐标检测");
                 })
                 .catch(error => {
                     console.error('加载图数据时出错:', error);
