@@ -128,9 +128,21 @@
             // 创建图数据结构
             const graph = new graphology.Graph();
             
-            // 创建Sigma实例
+            // 创建Sigma实例，添加边交互设置
             const container = document.getElementById('container');
-            const renderer = new Sigma(graph, container);
+            const renderer = new Sigma(graph, container, {
+                // 启用边交互
+                renderEdgeLabels: true,
+                enableEdgeEvents: true,
+                enableEdgeClickEvents: true,
+                enableEdgeWheelEvents: true,
+                enableEdgeHoverEvents: true,
+                // 增加边的宽度，使其更容易交互
+                edgeMinSize: 15,
+                edgeMaxSize: 15
+            });
+            
+            console.log("Sigma实例已创建，事件系统：", !!renderer.on);
             
             // 获取相机信息显示元素
             const cameraPositionEl = document.getElementById('camera-position');
@@ -142,12 +154,72 @@
             // 保存初始相机状态
             let initialCameraState = null;
             
+            // 存储边的原始颜色
+            const originalEdgeColors = {};
+            
+            // 监听边的鼠标事件
+            function setupEdgeHoverEffects() {
+                console.log("设置边悬停效果...");
+                
+                // 调试所有可用的事件
+                const availableEvents = renderer.eventNames();
+                console.log("可用事件:", availableEvents);
+                
+                // 鼠标进入边时高亮显示
+                renderer.on("enterEdge", ({ edge }) => {
+                    console.log("事件触发: enterEdge", edge);
+                    // 存储原始颜色（如果尚未存储）
+                    if (!originalEdgeColors[edge]) {
+                        originalEdgeColors[edge] = graph.getEdgeAttribute(edge, "color") || "#ccc";
+                    }
+                    
+                    // 改变边的颜色为高亮色
+                    graph.setEdgeAttribute(edge, "color", "#ff0000"); // 红色高亮
+                    
+                    // 更新渲染
+                    renderer.refresh();
+                });
+                
+                // 尝试使用不同的事件名称
+                renderer.on("edgeEnter", ({ edge }) => {
+                    console.log("事件触发: edgeEnter", edge);
+                });
+                
+                // 鼠标离开边时恢复原始颜色
+                renderer.on("leaveEdge", ({ edge }) => {
+                    console.log("事件触发: leaveEdge", edge);
+                    // 恢复边的原始颜色
+                    if (originalEdgeColors[edge]) {
+                        graph.setEdgeAttribute(edge, "color", originalEdgeColors[edge]);
+                    }
+                    
+                    // 更新渲染
+                    renderer.refresh();
+                });
+                
+                // 添加点击边的事件，用于测试边交互是否正常
+                renderer.on("clickEdge", ({ edge }) => {
+                    console.log("边被点击:", edge);
+                    
+                    // 闪烁效果显示边被点击
+                    const originalColor = graph.getEdgeAttribute(edge, "color");
+                    graph.setEdgeAttribute(edge, "color", "#00ff00");
+                    renderer.refresh();
+                    
+                    setTimeout(() => {
+                        graph.setEdgeAttribute(edge, "color", originalColor);
+                        renderer.refresh();
+                    }, 500);
+                });
+            }
+            
             // 定义事件处理函数 - 确保在使用前先定义
             window.onWheelEvent = function(e) {
                 // 延迟获取相机状态，因为Sigma处理滚轮事件需要时间
                 setTimeout(updateCameraInfo, 10);
             };
             
+             
             // 更新相机信息的函数
             function updateCameraInfo() {
                 const camera = renderer.getCamera();
@@ -249,7 +321,7 @@
             function setupProxyListener() {
                 clearAllListeners();
                 activeMethodEl.textContent = "Camera setState代理";
-                
+                console.log("ssssss!!");
                 try {
                     const camera = renderer.getCamera();
                     
@@ -334,7 +406,9 @@
                         // 确保边有必要的属性
                         graph.addEdge(edge.source, edge.target, {
                             weight: edge.weight || 1,
-                            color: edge.color || '#ccc'
+                            color: edge.color || '#ccc',
+                            size: 5, // 添加尺寸属性，让边更容易被鼠标选中
+                            type: 'arrow' // 使用箭头类型，更容易看到
                         });
                     });
                     
@@ -352,6 +426,9 @@
                     
                     // 保存初始相机状态
                     initialCameraState = renderer.getCamera().getState();
+                    
+                    // 设置边的悬停效果
+                    setupEdgeHoverEffects();
                     
                     // 获取按钮元素
                     const clusterButton = document.getElementById('clusterButton');

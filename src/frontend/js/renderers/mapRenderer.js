@@ -24,7 +24,7 @@ function initMapRender(data) {
   clusterContainer.style.height = "100%";
   clusterContainer.style.top = "0";
   clusterContainer.style.left = "0";
-  clusterContainer.style.zIndex = "2"; // 聚类图层在上方
+  clusterContainer.style.zIndex = "1"; // 聚类图层在上方
   clusterContainer.style.pointerEvents = "auto";
 
   const originalContainer = document.createElement("div");
@@ -34,7 +34,7 @@ function initMapRender(data) {
   originalContainer.style.height = "100%";
   originalContainer.style.top = "0";
   originalContainer.style.left = "0";
-  originalContainer.style.zIndex = "1"; // 原始数据图层在下方
+  originalContainer.style.zIndex = "2"; // 原始数据图层在下方
   originalContainer.style.pointerEvents = "auto"
 
   // 将两个容器添加到主容器中
@@ -76,28 +76,36 @@ function initMapRender(data) {
   // 创建原始数据图层的Sigma实例
   const originalRenderer = new Sigma(originalGraph, originalContainer, {
     // 渲染设置
-    renderEdgeLabels: false,
+    renderEdgeLabels: true,
     minCameraRatio: 0.1,
     maxCameraRatio: 2,
     defaultNodeColor: COLORS.ORIGINAL_NODE,
     defaultEdgeColor: COLORS.ORIGINAL_EDGE,
     zoomingRatio: 1,
     autoRescale: false,
+    // 边交互设置
+    enableEdgeEvents: true,
+    enableEdgeClickEvents: true,
+    enableEdgeWheelEvents: true,
+    enableEdgeHoverEvents: true,
+    // 增加边的尺寸，使其更容易被鼠标选中
+    edgeMinSize: 5,
+    edgeMaxSize: 8,
     // 设置半透明效果
-    nodeReducer: (node, data) => {
-      return {
-        ...data,
-        color: data.color ? data.color.replace('rgb', 'rgba').replace(')', ',0.3)') : 'rgba(180, 180, 180, 0.3)',
-        zIndex: 0
-      };
-    },
-    edgeReducer: (edge, data) => {
-      return {
-        ...data,
-        color: data.color ? data.color.replace('rgb', 'rgba').replace(')', ',0.2)') : 'rgba(150, 150, 150, 0.2)',
-        zIndex: 0
-      };
-    }
+    // nodeReducer: (node, data) => {
+    //   return {
+    //     ...data,
+    //     color: data.color ? data.color.replace('rgb', 'rgba').replace(')', ',0.3)') : 'rgba(180, 180, 180, 0.3)',
+    //     zIndex: 0
+    //   };
+    // },
+    // edgeReducer: (edge, data) => {
+    //   return {
+    //     ...data,
+    //     color: data.color ? data.color.replace('rgb', 'rgba').replace(')', ',0.2)') : 'rgba(150, 150, 150, 0.2)',
+    //     zIndex: 0
+    //   };
+    // }
   });
   
   // 加载原始数据到originalGraph
@@ -127,7 +135,7 @@ function initMapRender(data) {
       }
       
       originalGraph.addEdge(source, target, {
-        size: edge.size || 0.3,
+        size:  3,
         color: edge.color || COLORS.ORIGINAL_EDGE
       });
     } catch (e) {
@@ -275,14 +283,23 @@ function renderZoomView(graph, state, zoomLevel, zoomData) {
 async function switchToZoomLevel(zoomLevel, mapData) {
   const { clusterGraph, clusterRenderer, state } = mapData;
   
+  // 初始化正在获取数据的标记对象
+  if (!state.ongoingFetches) {
+    state.ongoingFetches = {};
+  }
+  
+  // 如果已经在获取该缩放等级的数据，直接返回
+  if (state.ongoingFetches[zoomLevel]) {
+    console.log(`缩放等级 ${zoomLevel} 的数据正在获取中，跳过重复请求。`);
+    return;
+  }
+  
   try {
     console.time(`切换到缩放等级 ${zoomLevel}`);
-    
 
-      // 其他缩放等级下，聚类图层完全可见，原始图层半透明
-      document.getElementById("cluster-layer").style.opacity = "1";
-      document.getElementById("original-layer").style.opacity = "0.5";
-    
+    // 其他缩放等级下，聚类图层完全可见，原始图层半透明
+    document.getElementById("cluster-layer").style.opacity = "1";
+    document.getElementById("original-layer").style.opacity = "1";
     
     // 检查缓存中是否已有该等级的数据
     if (!state.zoomData[zoomLevel]) {
@@ -290,6 +307,9 @@ async function switchToZoomLevel(zoomLevel, mapData) {
       
       // 显示加载指示器
       document.getElementById("loading-indicator")?.classList.remove("hidden");
+      
+      // 标记该缩放等级数据正在获取中
+      state.ongoingFetches[zoomLevel] = true;
       
       // 获取该缩放等级的聚类数据
       const clusterData = await fetchZoomClusterData(zoomLevel);
@@ -307,7 +327,7 @@ async function switchToZoomLevel(zoomLevel, mapData) {
     // 刷新视图
     clusterRenderer.refresh();
     
-    console.timeEnd(`切换到缩放等级 ${zoomLevel}`);
+    
     console.log(`已切换到缩放等级 ${zoomLevel}，显示 ${state.zoomData[zoomLevel].nodes.length} 个聚类节点`);
   } catch (error) {
     console.error(`切换到缩放等级 ${zoomLevel} 失败:`, error);
@@ -322,6 +342,13 @@ async function switchToZoomLevel(zoomLevel, mapData) {
         clusterRenderer.refresh();
       }
     }
+  }
+  finally {
+    // 无论成功或失败，都移除正在获取的标记
+    if (state.ongoingFetches) {
+      delete state.ongoingFetches[zoomLevel];
+    }
+    console.timeEnd(`切换到缩放等级 ${zoomLevel}`);
   }
 }
 

@@ -210,7 +210,7 @@ def main():
     print(f"实际生成的点数: {len(graph.vertices)}")
     
     # 测试四叉树性能
-    test_quadtree_performance(graph, num_queries=50)
+    # test_quadtree_performance(graph, num_queries=50)
     
     # 清理并导出数据
     data_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'data', 'map_data.json')

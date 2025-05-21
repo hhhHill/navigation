@@ -350,6 +350,7 @@ def get_zoom_clusters():
     """
     try:
         global ZOOM_LEVEL_CLUSTERS
+        global GRAPH
         
         # 从请求参数中获取缩放等级
         zoom_level = request.args.get('zoom_level', type=float)
@@ -359,6 +360,66 @@ def get_zoom_clusters():
             return jsonify({"error": "缺少必要的zoom_level参数"}), 400
             
         print(f"收到缩放等级 {zoom_level} 的聚类数据请求")
+        
+        # 特殊处理：当缩放比例等于0.1时，返回原始图数据
+        if zoom_level == 0.1:
+            print("缩放比例为0.1，返回原始图数据")
+            
+            # 确保图对象已初始化
+            if GRAPH is None:
+                return jsonify({"error": "图数据尚未加载完成，请稍后再试"}), 500
+                
+            start_time = time.time()
+            result_nodes = []
+            result_edges = []
+            
+            # 处理所有顶点
+            for vertex_id, vertex in GRAPH.vertices.items():
+                result_nodes.append({
+                    "id": vertex_id,
+                    "label": f"Node {vertex_id}",
+                    "x": vertex.x,
+                    "y": vertex.y,
+                    "size": 3,  # 使用固定大小
+                    "zoom_level": 0.1
+                })
+            
+            # 处理所有边
+            edge_set = set()
+            for edge_id, edge in GRAPH.edges.items():
+                source_id = edge.vertex1.id
+                target_id = edge.vertex2.id
+                
+                # 确保边的唯一性
+                if source_id > target_id:
+                    source_id, target_id = target_id, source_id
+                
+                edge_key = f"{source_id}_{target_id}"
+                if edge_key not in edge_set:
+                    edge_set.add(edge_key)
+                    result_edges.append({
+                        "id": f"{edge_key}_z0.1",
+                        "source": source_id,
+                        "target": target_id,
+                        "zoom_level": 0.1
+                    })
+            
+            # 构建返回结果
+            original_data = {
+                "nodes": result_nodes,
+                "edges": result_edges,
+                "params": {
+                    "zoom_level": 0.1,
+                    "node_count": len(result_nodes),
+                    "edge_count": len(result_edges),
+                    "is_original": True
+                }
+            }
+            
+            process_time = time.time() - start_time
+            print(f"原始图数据处理完成，耗时 {process_time:.2f} 秒，包含 {len(result_nodes)} 个节点和 {len(result_edges)} 条边")
+            
+            return jsonify(original_data)
         
         # 检查是否有预计算的数据
         if ZOOM_LEVEL_CLUSTERS is None or zoom_level not in ZOOM_LEVEL_CLUSTERS:

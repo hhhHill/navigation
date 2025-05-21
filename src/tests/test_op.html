@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        #target {
+            width: 900px;
+            height: 900px;
+            background: #2196F3; /* Div背景色 */
+            color: white;
+            transition: -webkit-mask 0.3s; /* 过渡动画 */
+        }
+    </style>
+</head>
+<body>
+    <div id="target">点击任意位置调整透明区域</div>
+
+    <script>
+        const target = document.getElementById('target');
+
+        // 初始遮罩：中心点，半径60px
+        applyMask(50, 50, 60);
+
+        // 点击更新遮罩位置
+        target.addEventListener('click', (e) => {
+            const rect = target.getBoundingClientRect();
+            const x = e.clientX - rect.left; // 相对div的X坐标
+            const y = e.clientY - rect.top;  // 相对div的Y坐标
+            applyMask(x, y, 60);
+        });
+
+        function applyMask(x, y, radius) {
+            // 使用百分比实现响应式定位
+            const xPercent = (x / target.offsetWidth * 100).toFixed(2);
+            const yPercent = (y / target.offsetHeight * 100).toFixed(2);
+            
+            const maskStyle = 
+                `radial-gradient(circle at ${xPercent}% ${yPercent}%, 
+                 rgba(0,0,0,1) ${radius}px, rgba(0,0,0,0) ${radius}px)`;
+            
+            // 兼容Webkit和非Webkit浏览器
+            target.style.webkitMask = maskStyle;
+            target.style.mask = maskStyle;
+        }
+    </script>
+</body>
+</html>

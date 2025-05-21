@@ -47,43 +47,41 @@ class DBSCAN:
         cluster_id = 0   # 当前聚类ID
         self.clusters = []  # 清空聚类列表
         
-        # 首先找出所有核心点
-        core_points = {}  # 存储核心点及其邻居
+        core_points_count = 0  # 核心点计数
+        
+        # 遍历所有顶点
         for vertex_id, vertex in graph.vertices.items():
+            # 如果顶点已经被访问，跳过
+            if vertex_id in visited:
+                continue
+                
             # 获取当前顶点的邻居
             neighbors = self._get_neighbors(vertex, graph)
             
             # 如果邻居数量不小于min_samples，则该点是核心点
             if len(neighbors) >= self.min_samples:
-                core_points[vertex_id] = neighbors
-        
-        print(f"找到 {len(core_points)} 个核心点")
-        
-        # 遍历所有核心点，为每个未访问的核心点创建一个新的聚类
-        for core_id, neighbors in core_points.items():
-            if core_id in visited:
-                continue
+                core_points_count += 1
                 
-            # 当前核心点未被访问，创建一个新的聚类
-            current_cluster = []
-            self.clusters.append(current_cluster)
-            
-            # 核心点自己加入聚类
-            core_vertex = graph.vertices[core_id]
-            self.cluster_labels[core_id] = cluster_id
-            current_cluster.append(core_vertex)
-            visited.add(core_id)
-            
-            # 将核心点的所有邻居加入当前聚类（仅限直接邻居，不再链式扩展）
-            for neighbor in neighbors:
-                if neighbor.id not in visited:
-                    visited.add(neighbor.id)
-                    self.cluster_labels[neighbor.id] = cluster_id
-                    current_cluster.append(neighbor)
-            
-            # 一个局部聚类处理完毕，准备下一个
-            cluster_id += 1
+                # 创建一个新的聚类
+                current_cluster = []
+                self.clusters.append(current_cluster)
+                
+                # 核心点自己加入聚类
+                self.cluster_labels[vertex_id] = cluster_id
+                current_cluster.append(vertex)
+                visited.add(vertex_id)
+                
+                # 将核心点的所有邻居加入当前聚类（仅限直接邻居，不再链式扩展）
+                for neighbor in neighbors:
+                    if neighbor.id not in visited:
+                        visited.add(neighbor.id)
+                        self.cluster_labels[neighbor.id] = cluster_id
+                        current_cluster.append(neighbor)
+                
+                # 一个局部聚类处理完毕，准备下一个
+                cluster_id += 1
         
+        print(f"找到 {core_points_count} 个核心点")
         return self
     
     def _get_neighbors(self, vertex, graph):
