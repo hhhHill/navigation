@@ -3,7 +3,7 @@
  */
 import { fetchNearbyNodesData } from '../api/apiService.js';
 import { highlightNearbyNodes, resetNodeAndEdgeColors } from './nodeHandler.js';
-import { showLoadingMessage, showResultMessage, showErrorMessage, removeElement, updateScaleInfo } from './uiUtils.js';
+import { showLoadingMessage, showResultMessage, showErrorMessage, removeElement, updateScaleInfo, addConsoleMessage } from './uiUtils.js';
 import { switchToZoomLevel} from '../renderers/mapRenderer.js';
 
 /**
@@ -13,48 +13,125 @@ import { switchToZoomLevel} from '../renderers/mapRenderer.js';
 function initEventListeners(mapData) {
   const { clusterGraph, originalGraph, clusterRenderer, originalRenderer, container, state } = mapData;
   
+  // 保存地图数据的全局引用
+  window.mapData = mapData;
+  
+  // 初始化地图实况查看开关状态
+  state.mapLiveActive = false;
+  
   // 添加初始全屏遮罩
   const originalLayer = document.getElementById("original-layer");
   if (originalLayer) {
-    // 初始时遮蔽原始图层，但保留0.2的可见度
-    const initialMaskStyle = `radial-gradient(circle at 50% 50%, rgba(0,0,0,0.2) 0px, rgba(0,0,0,0.2) 100%)`;
+    // 初始时完全遮蔽原始图层(完全透明)
+    const initialMaskStyle = `radial-gradient(circle at 50% 50%, rgba(0,0,0,0) 0px, rgba(0,0,0,0) 100%)`;
     originalLayer.style.webkitMask = initialMaskStyle;
     originalLayer.style.mask = initialMaskStyle;
-    console.log("初始化遮罩已应用，可见度0.2");
+    console.log("初始化遮罩已应用，完全透明");
   }
   
-  // 添加鼠标移动监听来跟踪鼠标位置并更新遮罩
-  state.currentMousePosition = { x: 0, y: 0 };
-  document.getElementById("original-layer").addEventListener('mousemove', function(e) {
-    const rect = this.getBoundingClientRect();
-    state.currentMousePosition = {
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top
-    };
-    
-    // 直接在鼠标移动时更新遮罩
-    const centerX = state.currentMousePosition.x;
-    const centerY = state.currentMousePosition.y;
-    const maskRadius = 150; // 使用固定值
-    
-    // 应用径向渐变遮罩
-    const maskStyle = 
-      `radial-gradient(circle at ${centerX}px ${centerY}px, 
-       rgba(0,0,0,1) 0px, rgba(0,0,0,1) ${maskRadius}px,
-       rgba(0,0,0,0.2) ${maskRadius + 1}px, rgba(0,0,0,0.2) 100%)`;
-    
-    this.style.webkitMask = maskStyle;
-    this.style.mask = maskStyle;
+  // 初始化可调整分隔条
+  initResizers();
+  
+  
+  // 添加窗口尺寸变化监听，以确保渲染器尺寸正确更新
+  window.addEventListener('resize', function() {
+    // 使用setTimeout确保在DOM尺寸实际更新后再刷新渲染器
+    setTimeout(() => {
+      if (clusterRenderer && originalRenderer) {
+        clusterRenderer.refresh();
+        originalRenderer.refresh();
+        // console.log("窗口尺寸已变更，渲染器已刷新");
+        // addConsoleMessage("窗口尺寸已变更，地图视图已调整");
+      }
+    }, 100);
   });
   
-  // 当鼠标离开original-layer时，恢复初始遮蔽状态
-  document.getElementById("original-layer").addEventListener('mouseleave', function() {
-    // 恢复全屏遮蔽，但保留0.2可见度
-    const fullMaskStyle = `radial-gradient(circle at 50% 50%, rgba(0,0,0,0.2) 0px, rgba(0,0,0,0.2) 100%)`;
-    this.style.webkitMask = fullMaskStyle;
-    this.style.mask = fullMaskStyle;
-    console.log("鼠标离开图层，恢复遮蔽状态");
-  });
+  // 绑定查看地图实况按钮事件
+  const mapLiveBtn = document.getElementById("mapLive");
+  if (mapLiveBtn) {
+    mapLiveBtn.addEventListener('click', function() {
+      state.mapLiveActive = !state.mapLiveActive;
+      
+      if (state.mapLiveActive) {
+        // 激活状态：原始图层部分可见
+        const activeMaskStyle = `radial-gradient(circle at 50% 50%, rgba(0,0,0,0.2) 0px, rgba(0,0,0,0.2) 100%)`;
+        originalLayer.style.webkitMask = activeMaskStyle;
+        originalLayer.style.mask = activeMaskStyle;
+        mapLiveBtn.classList.add('active');
+        mapLiveBtn.textContent = '关闭地图实况';
+        console.log("地图实况查看已启用");
+        
+        // 添加到控制台
+        addConsoleMessage("地图实况查看已启用");
+      } else {
+        // 关闭状态：原始图层完全透明
+        const inactiveMaskStyle = `radial-gradient(circle at 50% 50%, rgba(0,0,0,0) 0px, rgba(0,0,0,0) 100%)`;
+        originalLayer.style.webkitMask = inactiveMaskStyle;
+        originalLayer.style.mask = inactiveMaskStyle;
+        mapLiveBtn.classList.remove('active');
+        mapLiveBtn.textContent = '查看地图实况';
+        console.log("地图实况查看已禁用");
+        
+        // 添加到控制台
+        addConsoleMessage("地图实况查看已禁用");
+      }
+    });
+  }
+  
+  // 绑定控制台清空按钮事件
+  const clearConsoleBtn = document.getElementById("clearConsole");
+  if (clearConsoleBtn) {
+    clearConsoleBtn.addEventListener('click', function() {
+      const consoleOutput = document.getElementById("consoleOutput");
+      if (consoleOutput) {
+        consoleOutput.innerHTML = '';
+        addConsoleMessage("控制台已清空");
+      }
+    });
+  }
+  
+  // 保存鼠标移动事件处理函数引用，便于后期解绑或重绑定
+  const mouseMoveHandler = function(e) {
+    // 只有在地图实况激活时才响应鼠标移动事件
+    if (state.mapLiveActive) {
+      const rect = this.getBoundingClientRect();
+      state.currentMousePosition = {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top
+      };
+      
+      // 在鼠标移动时更新遮罩
+      const centerX = state.currentMousePosition.x;
+      const centerY = state.currentMousePosition.y;
+      const maskRadius = 30/(originalRenderer.getCamera().getState().ratio); // 使用固定值
+      
+      // 应用径向渐变遮罩
+      const maskStyle = 
+        `radial-gradient(circle at ${centerX}px ${centerY}px, 
+         rgba(0,0,0,1) 0px, rgba(0,0,0,1) ${maskRadius}px,
+         rgba(0,0,0,0.2) ${maskRadius + 1}px, rgba(0,0,0,0.2) 100%)`;
+      
+      this.style.webkitMask = maskStyle;
+      this.style.mask = maskStyle;
+    }
+  };
+  
+  // 保存鼠标离开事件处理函数引用
+  const mouseLeaveHandler = function() {
+    // 只有在地图实况激活时才响应鼠标离开事件
+    if (state.mapLiveActive) {
+      // 恢复全屏遮蔽，但保留0.2可见度
+      const fullMaskStyle = `radial-gradient(circle at 50% 50%, rgba(0,0,0,0.2) 0px, rgba(0,0,0,0.2) 100%)`;
+      this.style.webkitMask = fullMaskStyle;
+      this.style.mask = fullMaskStyle;
+      console.log("鼠标离开图层，恢复遮蔽状态");
+    }
+  };
+  
+  // 添加鼠标移动和离开事件监听
+  state.currentMousePosition = { x: 0, y: 0 };
+  document.getElementById("original-layer").addEventListener('mousemove', mouseMoveHandler);
+  document.getElementById("original-layer").addEventListener('mouseleave', mouseLeaveHandler);
   
   // 初始化双击处理相关变量
   let lastClickTime = 0;
@@ -85,32 +162,32 @@ function initEventListeners(mapData) {
   state.originalEdgeColors = {};
 
   // 边事件处理
-  // originalRenderer.on("enterEdge", ({ edge }) => {
-  //   console.log("进入边事件触发:", edge);
+  originalRenderer.on("enterEdge", ({ edge }) => {
+    // console.log("进入边事件触发:", edge);
     
-  //   // 存储原始颜色（如果尚未存储）
-  //   if (!state.originalEdgeColors[edge]) {
-  //     state.originalEdgeColors[edge] = originalGraph.getEdgeAttribute(edge, "color") || COLORS.ORIGINAL_EDGE;
-  //   }
+    // 存储原始颜色（如果尚未存储）
+    if (!state.originalEdgeColors[edge]) {
+      state.originalEdgeColors[edge] = originalGraph.getEdgeAttribute(edge, "color") || COLORS.ORIGINAL_EDGE;
+    }
     
-  //   // 改变边的颜色为高亮色并完全不透明
-  //   originalGraph.setEdgeAttribute(edge, "color", "rgb(255, 0, 0)"); // 纯红色，完全不透明
-  //   originalGraph.setEdgeAttribute(edge, "size", 12); // 增加边的大小使其更明显
-  //   originalGraph.setEdgeAttribute(edge, "zIndex", 20); // 设置非常高的z-index确保在最上层
-  //   originalRenderer.refresh();
-  // });
+    // 改变边的颜色为高亮色并完全不透明
+    originalGraph.setEdgeAttribute(edge, "color", "rgb(0, 72, 255)"); // 纯红色，完全不透明
+    originalGraph.setEdgeAttribute(edge, "size", 12); // 增加边的大小使其更明显
+    originalGraph.setEdgeAttribute(edge, "zIndex", 20); // 设置非常高的z-index确保在最上层
+    originalRenderer.refresh();
+  });
 
-  // originalRenderer.on("leaveEdge", ({ edge }) => {
-  //   console.log("离开边事件触发:", edge);
+  originalRenderer.on("leaveEdge", ({ edge }) => {
+    // console.log("离开边事件触发:", edge);
     
-  //   // 恢复边的原始颜色
-  //   if (state.originalEdgeColors[edge]) {
-  //     originalGraph.setEdgeAttribute(edge, "color", state.originalEdgeColors[edge]);
-  //     originalGraph.setEdgeAttribute(edge, "size", 3);
-  //     originalGraph.setEdgeAttribute(edge, "zIndex", 0); // 恢复默认zIndex
-  //     originalRenderer.refresh();
-  //   }
-  // });
+    // 恢复边的原始颜色
+    if (state.originalEdgeColors[edge]) {
+      originalGraph.setEdgeAttribute(edge, "color", state.originalEdgeColors[edge]);
+      originalGraph.setEdgeAttribute(edge, "size", 3);
+      originalGraph.setEdgeAttribute(edge, "zIndex", 0); // 恢复默认zIndex
+      originalRenderer.refresh();
+    }
+  });
 
   // 添加边点击事件
   originalRenderer.on("clickEdge", ({ edge }) => {
@@ -262,7 +339,6 @@ function initEventListeners(mapData) {
       // 找到最接近的预定义缩放等级
       if (typeof newState.ratio === 'number' && !isNaN(newState.ratio)) {
         const closestZoomLevel = findClosestZoomLevel(newState.ratio, state.zoomThresholds);
-        
         // 如果缩放等级发生变化，切换到相应的聚类视图
         if (state.currentZoomLevel !== closestZoomLevel) {
           console.log(`缩放等级变化: ${state.currentZoomLevel} -> ${closestZoomLevel}`);
@@ -281,9 +357,6 @@ function initEventListeners(mapData) {
   try {
     const originalCamera = originalRenderer.getCamera();
     
-    // 保存原始相机方法
-    const originalSetState = originalCamera.setState;
-    const originalAnimate = originalCamera.animate;
     
     // 相机状态变更事件监听：非直接代理方式
     originalRenderer.on("afterRender", () => {
@@ -298,23 +371,8 @@ function initEventListeners(mapData) {
       }
     });
     
-    // 代理setState方法
-    originalCamera.setState = function(nextState) {
-      // 调用原始函数更新相机状态
-      originalSetState.call(originalCamera, nextState);
-      
-      // 避免无限循环：不在这里直接处理，让afterRender事件处理
-    };
     
-    // 代理animate方法（处理鼠标双击重置等操作）
-    originalCamera.animate = function(nextState, opts) {
-      // 调用原始函数执行动画
-      originalAnimate.call(originalCamera, nextState, opts);
-      
-      // 避免重复处理，动画期间的渲染会触发afterRender事件
-    };
-    
-    console.log("相机状态监听器已设置，使用afterRender事件代替轮询机制");
+    // console.log("相机状态监听器已设置，使用afterRender事件代替轮询机制");
   } catch (error) {
     console.error("设置相机状态监听器失败:", error);
     
@@ -397,5 +455,158 @@ async function handleNearbyNodesRequest(x, y, count, mapData) {
   }
 }
 
+/**
+ * 初始化分隔条调整功能
+ */
+function initResizers() {
+  const mainResizer = document.getElementById('main-resizer');
+  const mapContainer = document.getElementById('map-container');
+  const bottomSection = document.querySelector('.bottom-section');
+  
+  if (!mainResizer || !mapContainer || !bottomSection) {
+    console.error('找不到必要的DOM元素，无法初始化分隔条');
+    return;
+  }
+  
+  let startY = 0;
+  let startHeight = 0;
+  let startBottomHeight = 0;
+  
+  // 创建Sigma.js渲染器尺寸调整函数
+  const resizeSigmaRenderers = function() {
+    if (window.mapData && window.mapData.clusterRenderer && window.mapData.originalRenderer) {
+      const clusterRenderer = window.mapData.clusterRenderer;
+      const originalRenderer = window.mapData.originalRenderer;
+      
+      // 获取容器和画布
+      const clusterDom = clusterRenderer.getContainer();
+      const originalDom = originalRenderer.getContainer();
+      const mapWidth = mapContainer.offsetWidth;
+      const mapHeight = mapContainer.offsetHeight;
+      
+      // 触发全局尺寸调整事件
+      const resizeEvent = new Event('resize');
+      window.dispatchEvent(resizeEvent);
+      
+      // 调整集群图层的尺寸
+      if (clusterDom) {
+        const canvas = clusterDom.querySelector('canvas');
+        if (canvas) {
+          canvas.width = mapWidth;
+          canvas.height = mapHeight;
+        }
+      }
+      
+      // 调整原始图层的尺寸
+      if (originalDom) {
+        const canvas = originalDom.querySelector('canvas');
+        if (canvas) {
+          canvas.width = mapWidth;
+          canvas.height = mapHeight;
+        }
+      }
+      
+      // 延迟刷新确保尺寸变更已应用
+      setTimeout(() => {
+        // 保存并恢复相机状态以确保视图稳定
+        const camera = originalRenderer.getCamera();
+        const state = camera ? camera.getState() : null;
+        
+        // 刷新两个渲染器
+        clusterRenderer.refresh();
+        originalRenderer.refresh();
+        
+        // 恢复相机状态
+        if (camera && state) {
+          camera.setState(state);
+        }
+        
+        // 再次刷新以确保所有更改都已应用
+        clusterRenderer.refresh();
+        originalRenderer.refresh();
+      }, 20);
+    }
+  };
+  
+  const onMouseDown = function(e) {
+    // 记录初始位置和高度
+    startY = e.clientY;
+    startHeight = mapContainer.offsetHeight;
+    startBottomHeight = bottomSection.offsetHeight;
+    
+    // 添加事件监听
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+    
+    // 添加拖动时的样式
+    document.body.style.cursor = 'ns-resize';
+    document.body.style.userSelect = 'none';
+    mainResizer.classList.add('active');
+    
+    // 阻止默认事件和冒泡
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // 记录到控制台
+    addConsoleMessage('开始调整区域大小');
+  };
+  
+  const onMouseMove = function(e) {
+    // 计算移动的距离
+    const deltaY = e.clientY - startY;
+    const containerHeight = mapContainer.parentElement.offsetHeight;
+    
+    // 计算新的高度（确保最小高度）
+    const newMapHeight = Math.max(100, Math.min(containerHeight - 100, startHeight + deltaY));
+    const newBottomHeight = containerHeight - newMapHeight;
+    
+    // 计算百分比
+    const mapPercent = (newMapHeight / containerHeight) * 100;
+    const bottomPercent = 100 - mapPercent;
+    
+    // 应用新的高度
+    mapContainer.style.height = `${mapPercent}%`;
+    bottomSection.style.top = `${mapPercent}%`;
+    bottomSection.style.height = `${bottomPercent}%`;
+    mainResizer.style.top = `${mapPercent}%`;
+    
+    // 更新渲染器大小
+    resizeSigmaRenderers();
+    
+    e.preventDefault();
+  };
+  
+  const onMouseUp = function() {
+    // 移除事件监听
+    document.removeEventListener('mousemove', onMouseMove);
+    document.removeEventListener('mouseup', onMouseUp);
+    
+    // 移除拖动时的样式
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+    mainResizer.classList.remove('active');
+    
+    // 记录到控制台
+    const mapPercent = Math.round((mapContainer.offsetHeight / mapContainer.parentElement.offsetHeight) * 100);
+    addConsoleMessage(`区域大小已调整为 ${mapPercent}:${100-mapPercent}`);
+  };
+  
+  // 绑定鼠标按下事件
+  mainResizer.addEventListener('mousedown', onMouseDown);
+  
+  // 双击重置为默认比例
+  mainResizer.addEventListener('dblclick', function() {
+    mapContainer.style.height = '60%';
+    bottomSection.style.top = '60%';
+    bottomSection.style.height = '40%';
+    mainResizer.style.top = '60%';
+    
+    // 更新渲染器大小
+    resizeSigmaRenderers();
+    
+    // 记录到控制台
+    addConsoleMessage('区域大小已重置为默认比例 60:40');
+  });
+}
 
 export { initEventListeners, handleNearbyNodesRequest }; 

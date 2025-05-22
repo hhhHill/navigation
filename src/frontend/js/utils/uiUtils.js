@@ -57,7 +57,23 @@ function showLoadingMessage(container, message) {
  * @returns {HTMLElement} 创建的消息元素
  */
 function showResultMessage(container, message) {
-  return showMessage(container, message, 'success');
+  const messageElement = document.createElement('div');
+  messageElement.className = 'message success';
+  messageElement.textContent = message;
+  container.appendChild(messageElement);
+  
+  // 添加到控制台
+  addConsoleMessage(message, 'success');
+  
+  // 2秒后自动移除消息
+  setTimeout(() => {
+    messageElement.style.opacity = '0';
+    setTimeout(() => {
+      if (messageElement.parentNode) {
+        messageElement.parentNode.removeChild(messageElement);
+      }
+    }, 300);
+  }, 2000);
 }
 
 /**
@@ -67,7 +83,23 @@ function showResultMessage(container, message) {
  * @returns {HTMLElement} 创建的消息元素
  */
 function showErrorMessage(container, message) {
-  return showMessage(container, message, 'error');
+  const messageElement = document.createElement('div');
+  messageElement.className = 'message error';
+  messageElement.textContent = message;
+  container.appendChild(messageElement);
+  
+  // 添加到控制台
+  addConsoleMessage(message, 'error');
+  
+  // 3秒后自动移除消息
+  setTimeout(() => {
+    messageElement.style.opacity = '0';
+    setTimeout(() => {
+      if (messageElement.parentNode) {
+        messageElement.parentNode.removeChild(messageElement);
+      }
+    }, 300);
+  }, 3000);
 }
 
 /**
@@ -119,24 +151,55 @@ function removeElement(elementId) {
  * @param {Object} position - 位置对象，包含top、left和right属性
  * @returns {HTMLElement} 创建的按钮元素
  */
-function createControlButton(container, id, text, clickHandler, position = { top: '10px', left: '10px' }) {
+function createControlButton(container, id, text, clickHandler, position) {
   const button = document.createElement('button');
   button.id = id;
   button.className = 'control-button';
   button.textContent = text;
-  button.style.top = position.top;
   
-  // 支持left和right定位
-  if (position.right !== undefined) {
-    button.style.right = position.right;
-  } else {
-    button.style.left = position.left || '10px';
+  // 只有传递position参数时才设置绝对定位
+  if (position) {
+    button.style.position = 'absolute';
+    if (position.top) button.style.top = position.top;
+    if (position.right !== undefined) {
+      button.style.right = position.right;
+    } else if (position.left !== undefined) {
+      button.style.left = position.left;
+    }
   }
   
   button.addEventListener('click', clickHandler);
   
   container.appendChild(button);
   return button;
+}
+
+/**
+ * 添加消息到控制台
+ * @param {string} message - 要显示的消息
+ * @param {string} type - 消息类型 (普通消息不需要，可选: 'error', 'warning', 'success')
+ */
+function addConsoleMessage(message, type = '') {
+  const consoleOutput = document.getElementById('consoleOutput');
+  if (!consoleOutput) return;
+  
+  const lineElement = document.createElement('div');
+  lineElement.className = `console-line ${type}`;
+  
+  // 添加时间戳
+  const now = new Date();
+  const timestamp = `[${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}]`;
+  
+  lineElement.textContent = `${timestamp} ${message}`;
+  consoleOutput.appendChild(lineElement);
+  
+  // 添加后强制触发滚动条刷新
+  consoleOutput.style.overflow = 'hidden';
+  setTimeout(() => {
+    consoleOutput.style.overflow = 'scroll';
+    // 自动滚动到底部
+    consoleOutput.scrollTop = consoleOutput.scrollHeight;
+  }, 0);
 }
 
 export {
@@ -147,5 +210,6 @@ export {
   showErrorMessage,
   showMessage,
   removeElement,
-  createControlButton
+  createControlButton,
+  addConsoleMessage
 }; 

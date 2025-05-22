@@ -23,20 +23,34 @@ async function initApp() {
     // 初始化事件监听器
     initEventListeners(mapData);
     
-    // 创建重置视图按钮
-    createControlButton(
-      mapData.container, 
-      'reset-view-button', 
-      '重置视图', 
-      () => mapData.renderer.getCamera().animatedReset(),
-      { top: '10px', right: '10px', left: 'auto' }
-    );
+    // 创建控制按钮容器
+    const controlContainer = document.createElement('div');
+    controlContainer.id = 'map-controls';
+    mapData.container.appendChild(controlContainer);
     
-    // 阻止地图容器上的滚轮事件默认行为（防止页面滚动）
-    const mapContainer = document.getElementById('map-container');
-    mapContainer.addEventListener('wheel', (event) => {
-      event.preventDefault();
-    }, { passive: false });
+    // 按钮配置数组
+    const buttons = [
+      {
+        id: 'reset-view-button',
+        text: '重置视图',
+        handler: () => mapData.originalRenderer.getCamera().animatedReset()
+      },
+      {
+        id: 'zoom-in-button',
+        text: '增大',
+        handler: () => mapData.originalRenderer.getCamera().animatedZoom(1.1)
+      },
+      {
+        id: 'zoom-out-button',
+        text: '减小',
+        handler: () => mapData.originalRenderer.getCamera().animatedUnzoom(1.1)
+      }
+    ];
+    
+    // 循环创建按钮
+    buttons.forEach(btn => {
+      createControlButton(controlContainer, btn.id, btn.text, btn.handler);
+    });
     
     // 移除加载提示
     const loadingElement = document.querySelector(".loading");

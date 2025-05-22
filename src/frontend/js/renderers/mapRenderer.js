@@ -91,21 +91,7 @@ function initMapRender(data) {
     // 增加边的尺寸，使其更容易被鼠标选中
     edgeMinSize: 5,
     edgeMaxSize: 8,
-    // 设置半透明效果
-    // nodeReducer: (node, data) => {
-    //   return {
-    //     ...data,
-    //     color: data.color ? data.color.replace('rgb', 'rgba').replace(')', ',0.3)') : 'rgba(180, 180, 180, 0.3)',
-    //     zIndex: 0
-    //   };
-    // },
-    // edgeReducer: (edge, data) => {
-    //   return {
-    //     ...data,
-    //     color: data.color ? data.color.replace('rgb', 'rgba').replace(')', ',0.2)') : 'rgba(150, 150, 150, 0.2)',
-    //     zIndex: 0
-    //   };
-    // }
+
   });
   
   // 加载原始数据到originalGraph
@@ -126,6 +112,7 @@ function initMapRender(data) {
   // 添加边
   state.detailEdges.forEach(edge => {
     try {
+      
       const source = edge.source !== undefined ? edge.source : edge.from;
       const target = edge.target !== undefined ? edge.target : edge.to;
       
