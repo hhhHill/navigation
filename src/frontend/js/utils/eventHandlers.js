@@ -32,20 +32,7 @@ function initEventListeners(mapData) {
   // 初始化可调整分隔条
   initResizers();
   
-  
-  // 添加窗口尺寸变化监听，以确保渲染器尺寸正确更新
-  window.addEventListener('resize', function() {
-    // 使用setTimeout确保在DOM尺寸实际更新后再刷新渲染器
-    setTimeout(() => {
-      if (clusterRenderer && originalRenderer) {
-        clusterRenderer.refresh();
-        originalRenderer.refresh();
-        // console.log("窗口尺寸已变更，渲染器已刷新");
-        // addConsoleMessage("窗口尺寸已变更，地图视图已调整");
-      }
-    }, 100);
-  });
-  
+
   // 绑定查看地图实况按钮事件
   const mapLiveBtn = document.getElementById("mapLive");
   if (mapLiveBtn) {
@@ -92,6 +79,7 @@ function initEventListeners(mapData) {
   
   // 保存鼠标移动事件处理函数引用，便于后期解绑或重绑定
   const mouseMoveHandler = function(e) {
+    // console.log("mouseMoveHandler 触发"); // 添加日志
     // 只有在地图实况激活时才响应鼠标移动事件
     if (state.mapLiveActive) {
       const rect = this.getBoundingClientRect();
@@ -161,33 +149,33 @@ function initEventListeners(mapData) {
   // 保存边的原始颜色
   state.originalEdgeColors = {};
 
-  // 边事件处理
-  originalRenderer.on("enterEdge", ({ edge }) => {
-    // console.log("进入边事件触发:", edge);
+  // // 边事件处理
+  // originalRenderer.on("enterEdge", ({ edge }) => {
+  //   // console.log("进入边事件触发:", edge);
     
-    // 存储原始颜色（如果尚未存储）
-    if (!state.originalEdgeColors[edge]) {
-      state.originalEdgeColors[edge] = originalGraph.getEdgeAttribute(edge, "color") || COLORS.ORIGINAL_EDGE;
-    }
+  //   // 存储原始颜色（如果尚未存储）
+  //   if (!state.originalEdgeColors[edge]) {
+  //     state.originalEdgeColors[edge] = originalGraph.getEdgeAttribute(edge, "color") || COLORS.ORIGINAL_EDGE;
+  //   }
     
-    // 改变边的颜色为高亮色并完全不透明
-    originalGraph.setEdgeAttribute(edge, "color", "rgb(0, 72, 255)"); // 纯红色，完全不透明
-    originalGraph.setEdgeAttribute(edge, "size", 12); // 增加边的大小使其更明显
-    originalGraph.setEdgeAttribute(edge, "zIndex", 20); // 设置非常高的z-index确保在最上层
-    originalRenderer.refresh();
-  });
+  //   // 改变边的颜色为高亮色并完全不透明
+  //   originalGraph.setEdgeAttribute(edge, "color", "rgb(0, 72, 255)"); // 纯红色，完全不透明
+  //   originalGraph.setEdgeAttribute(edge, "size", 12); // 增加边的大小使其更明显
+  //   originalGraph.setEdgeAttribute(edge, "zIndex", 20); // 设置非常高的z-index确保在最上层
+  //   originalRenderer.refresh();
+  // });
 
-  originalRenderer.on("leaveEdge", ({ edge }) => {
-    // console.log("离开边事件触发:", edge);
+  // originalRenderer.on("leaveEdge", ({ edge }) => {
+  //   // console.log("离开边事件触发:", edge);
     
-    // 恢复边的原始颜色
-    if (state.originalEdgeColors[edge]) {
-      originalGraph.setEdgeAttribute(edge, "color", state.originalEdgeColors[edge]);
-      originalGraph.setEdgeAttribute(edge, "size", 3);
-      originalGraph.setEdgeAttribute(edge, "zIndex", 0); // 恢复默认zIndex
-      originalRenderer.refresh();
-    }
-  });
+  //   // 恢复边的原始颜色
+  //   if (state.originalEdgeColors[edge]) {
+  //     originalGraph.setEdgeAttribute(edge, "color", state.originalEdgeColors[edge]);
+  //     originalGraph.setEdgeAttribute(edge, "size", 3);
+  //     originalGraph.setEdgeAttribute(edge, "zIndex", 0); // 恢复默认zIndex
+  //     originalRenderer.refresh();
+  //   }
+  // });
 
   // 添加边点击事件
   originalRenderer.on("clickEdge", ({ edge }) => {
@@ -330,6 +318,7 @@ function initEventListeners(mapData) {
         clusterCamera.ratio = newState.ratio;
       }
       clusterRenderer.refresh(); // 刷新集群图层
+      console.log("clusterRenderer.refresh() 已调用"); // 添加日志
       
       // 更新缩放比例显示
       if (mapData.scaleInfo && typeof newState.ratio === 'number' && !isNaN(newState.ratio)) {
@@ -353,37 +342,25 @@ function initEventListeners(mapData) {
     }
   }
 
-  // 使用更安全的方式代理相机状态变化
-  try {
-    const originalCamera = originalRenderer.getCamera();
-    
-    
-    // 相机状态变更事件监听：非直接代理方式
-    originalRenderer.on("afterRender", () => {
-      const currentState = originalCamera.getState();
-      const lastState = state.lastCameraState || {};
-      
-      // 检查相机状态是否发生变化
-      if (currentState.ratio !== lastState.ratio || 
-          currentState.x !== lastState.x || 
-          currentState.y !== lastState.y) {
-        handleCameraStateChange(currentState);
-      }
-    });
-    
-    
-    // console.log("相机状态监听器已设置，使用afterRender事件代替轮询机制");
-  } catch (error) {
-    console.error("设置相机状态监听器失败:", error);
-    
-    // 如果出现错误，回退到轮询方法
-    state.cameraPollingInterval = setInterval(function() {
-      const currentState = originalRenderer.getCamera().getState();
+  // 使用 afterRender 事件替代轮询机制来监听相机状态变化
+  originalRenderer.on("afterRender", function() {
+    const currentState = originalRenderer.getCamera().getState();
+    const lastState = state.lastCameraState || {};
+
+    // 验证相机状态有效性
+    if (!currentState || typeof currentState !== 'object') {
+      return;
+    }
+
+    // 检查相机状态是否发生变化
+    if (currentState.ratio !== lastState.ratio ||
+        currentState.x !== lastState.x ||
+        currentState.y !== lastState.y) {
       handleCameraStateChange(currentState);
-    }, 100);
-    
-    console.warn("已回退到轮询方式监听相机状态");
-  }
+    }
+  });
+
+  console.log("相机状态监听已设置为 afterRender 事件机制");
 }
 
 /**
@@ -437,6 +414,7 @@ async function handleNearbyNodesRequest(x, y, count, mapData) {
     
     clusterRenderer.refresh();
     originalRenderer.refresh();
+    console.log("handleNearbyNodesRequest: clusterRenderer.refresh() and originalRenderer.refresh() called"); // 添加日志
     
     // 移除加载提示
     removeElement('loading-nearby');
@@ -506,25 +484,6 @@ function initResizers() {
         }
       }
       
-      // 延迟刷新确保尺寸变更已应用
-      setTimeout(() => {
-        // 保存并恢复相机状态以确保视图稳定
-        const camera = originalRenderer.getCamera();
-        const state = camera ? camera.getState() : null;
-        
-        // 刷新两个渲染器
-        clusterRenderer.refresh();
-        originalRenderer.refresh();
-        
-        // 恢复相机状态
-        if (camera && state) {
-          camera.setState(state);
-        }
-        
-        // 再次刷新以确保所有更改都已应用
-        clusterRenderer.refresh();
-        originalRenderer.refresh();
-      }, 20);
     }
   };
   
@@ -564,14 +523,15 @@ function initResizers() {
     const mapPercent = (newMapHeight / containerHeight) * 100;
     const bottomPercent = 100 - mapPercent;
     
-    // 应用新的高度
+    // 应用新的高度 - 只更新CSS样式，保持流畅拖动
     mapContainer.style.height = `${mapPercent}%`;
     bottomSection.style.top = `${mapPercent}%`;
     bottomSection.style.height = `${bottomPercent}%`;
     mainResizer.style.top = `${mapPercent}%`;
     
-    // 更新渲染器大小
-    resizeSigmaRenderers();
+    // 移除频繁的渲染器尺寸更新调用以避免卡顿
+    // console.log("更新渲染器大小");
+    // resizeSigmaRenderers();
     
     e.preventDefault();
   };
@@ -585,6 +545,17 @@ function initResizers() {
     document.body.style.cursor = '';
     document.body.style.userSelect = '';
     mainResizer.classList.remove('active');
+    
+    // 拖动结束后更新渲染器尺寸
+    console.log("拖动结束，更新渲染器大小");
+    resizeSigmaRenderers();
+    
+    // 手动触发渲染器刷新以确保图谱正确显示
+    if (window.mapData && window.mapData.clusterRenderer && window.mapData.originalRenderer) {
+      window.mapData.clusterRenderer.refresh();
+      window.mapData.originalRenderer.refresh();
+      console.log("Sigma.js 渲染器已刷新 (拖动结束)"); // 添加日志
+    }
     
     // 记录到控制台
     const mapPercent = Math.round((mapContainer.offsetHeight / mapContainer.parentElement.offsetHeight) * 100);

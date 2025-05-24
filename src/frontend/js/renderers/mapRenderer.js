@@ -52,7 +52,7 @@ function initMapRender(data) {
     detailEdges: detailData.edges,
     // 缩放模式相关状态
     currentZoomLevel: null,
-    zoomThresholds: [0.1, 0.3, 0.5, 1.0],
+    zoomThresholds: [0.3, 0.5, 1.0],
     zoomData: {}, // 缓存不同缩放等级的数据
   };
   

@@ -16,8 +16,17 @@ let currentlyDrawingQuadtree = false;
 export function initQuadtreeCanvas(canvas) {
   quadtreeCanvas = canvas;
   quadtreeCtx = canvas.getContext('2d');
-  quadtreeCanvas.width = window.innerWidth;
-  quadtreeCanvas.height = window.innerHeight;
+  
+  // 获取map-container的大小，而不是window的大小
+  const mapContainer = document.getElementById('map-container');
+  if (mapContainer) {
+    quadtreeCanvas.width = mapContainer.clientWidth;
+    quadtreeCanvas.height = mapContainer.clientHeight;
+  } else {
+    console.warn('map-container不存在，使用默认大小');
+    quadtreeCanvas.width = window.innerWidth;
+    quadtreeCanvas.height = window.innerHeight;
+  }
 }
 
 /**
@@ -107,8 +116,15 @@ export async function visualizeQuadtreeStepByStep() {
 export function handleResize() {
     if (!quadtreeCanvas) return;
     
-    quadtreeCanvas.width = window.innerWidth;
-    quadtreeCanvas.height = window.innerHeight;
+    // 获取map-container的大小，而不是window的大小
+    const mapContainer = document.getElementById('map-container');
+    if (mapContainer) {
+      quadtreeCanvas.width = mapContainer.clientWidth;
+      quadtreeCanvas.height = mapContainer.clientHeight;
+    } else {
+      quadtreeCanvas.width = window.innerWidth;
+      quadtreeCanvas.height = window.innerHeight;
+    }
     
     if (sigmaInstance && allQuadtreeBoundaries.length > 0) {
         drawQuadtreeBoundaries(allQuadtreeBoundaries);

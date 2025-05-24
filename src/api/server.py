@@ -196,7 +196,7 @@ def quadtree_viz_page():
     """提供四叉树可视化页面"""
     return send_from_directory(os.path.join(app.static_folder, 'html'), 'quadtree.html')
 
-@app.route('/')
+@app.route('/map')
 def index():
     """提供前端页面"""
     return send_from_directory(os.path.join(app.static_folder, 'html'), 'index.html')
@@ -509,7 +509,7 @@ def precompute_zoom_level_clusters(graph):
     
     # 定义要处理的缩放等级
     # 适应sigmajs的缩放等级范围(0.1-5)
-    zoom_levels = [0.3,0.5, 1.0]
+    zoom_levels = [0.3,0.5,1.0]
     
     for zoom_level in zoom_levels:
         print(f"预计算缩放等级 {zoom_level} 的聚类...")

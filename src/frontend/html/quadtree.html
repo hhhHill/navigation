@@ -3,10 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quadtree Visualization with Nodes</title>
+    <title>四叉树可视化</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/sigma.js/2.4.0/sigma.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/graphology/0.25.4/graphology.umd.min.js"></script>
     <link rel="stylesheet" href="../css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
     <style>
         #quadtreeCanvas {
             position: absolute;
@@ -21,23 +23,84 @@
     </style>
 </head>
 <body>
-    <div class="loading">Loading Map and Quadtree...</div>
+    <div class="loading">加载四叉树可视化中...</div>
     <div class="app-container">
-        <header class="app-header">
-            <h1>Quadtree Visualization</h1>
-        </header>
         <main class="app-content">
             <aside class="app-sidebar">
-                <!-- 侧边栏内容可以放置在这里 -->
+                <div class="sidebar-header animate__animated animate__fadeIn">
+                    <div class="logo">
+                        <span class="logo-text">智能导航</span>
+                    </div>
+                </div>
+                <nav class="sidebar-nav">
+                    <ul>
+                        <li class="nav-item animate__animated animate__fadeInLeft" style="animation-delay: 0.1s;">
+                            <a href="map">
+                                <span class="nav-icon">🗺️</span>
+                                <span class="nav-text">导航地图</span>
+                            </a>
+                        </li>
+                        <li class="nav-item active animate__animated animate__fadeInLeft" style="animation-delay: 0.2s;">
+                            <a href="quadtree-viz">
+                                <span class="nav-icon">🌲</span>
+                                <span class="nav-text">四叉树可视化</span>
+                            </a>
+                        </li>
+                    </ul>
+                </nav>
+                <div class="sidebar-section animate__animated animate__fadeIn" style="animation-delay: 0.3s;">
+                    <h3 class="section-title">四叉树介绍</h3>
+                    <div class="section-content">
+                        <p>四叉树是一种树形数据结构，每个内部节点都有四个子节点，常用于空间索引和区域查询优化。</p>
+                        <p>本页面可视化展示了四叉树在地图空间索引中的应用，实现高效的近邻点查询。</p>
+                    </div>
+                </div>
+                <div class="sidebar-section animate__animated animate__fadeIn" style="animation-delay: 0.4s;">
+                    <h3 class="section-title">技术原理</h3>
+                    <div class="section-content">
+                        <p>• 递归划分：将空间分为四个象限</p>
+                        <p>• 自适应：根据点密度动态调整深度</p>
+                        <p>• 时间复杂度：查询时间降至O(log n)</p>
+                        <p>• 应用：空间索引、碰撞检测等</p>
+                    </div>
+                </div>
+                <div class="sidebar-section animate__animated animate__fadeIn" style="animation-delay: 0.5s;">
+                    <h3 class="section-title">操作指南</h3>
+                    <div class="section-content">
+                        <p>• 缩放可查看不同层级的划分</p>
+                        <p>• 移动鼠标查看四叉树节点详情</p>
+                        <p>• 点击区域查看包含的数据点</p>
+                    </div>
+                </div>
+                <div class="sidebar-footer">
+                    <span>© 2023 网络工程
+                    </span>
+                </div>
             </aside>
             <div class="app-main">
-                <div id="map-container"></div>
-                <canvas id="quadtreeCanvas"></canvas>
+                <div id="map-container">
+                    <canvas id="quadtreeCanvas"></canvas>
+                </div>
+                <div id="scale-info"></div>
+                <div class="resizer" id="main-resizer">
+                    <div class="resizer-handle"></div>
+                </div>
+                <div class="bottom-section">
+                    <div class="console-panel">
+                        <div class="console-header">
+                            <h3>输出控制台</h3>
+                            <button class="console-btn" id="clearConsole">清空</button>
+                        </div>
+                        <div class="console-output" id="consoleOutput">
+                            <div class="console-line">四叉树可视化系统初始化完成</div>
+                            <div class="console-line success">四叉树渲染引擎已加载</div>
+                            <div class="console-line">拖动分隔条可以调整地图与控制台比例</div>
+                            <div class="console-line">双击分隔条可以重置为默认比例</div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </main>
-        <footer class="app-footer">
-            <!-- 页脚内容可以放置在这里 -->
-        </footer>
     </div>
 
     <!-- 导入页面主脚本 -->

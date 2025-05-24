@@ -204,7 +204,7 @@ def main():
     # 测试小规模地图生成（为了前端渲染效率，使用较小的规模）
     print("\n\n测试加载或生成地图")
     # 加载已存在的地图，如果加载失败则生成新地图
-    graph = test_random_map_generation(n=100, load_existing=False)
+    graph = test_random_map_generation(n=20000, load_existing=False)
     
     # 检查实际生成的点数
     print(f"实际生成的点数: {len(graph.vertices)}")
