@@ -69,15 +69,7 @@ function initEventListeners(mapData) {
   const root = document.documentElement;
   root.style.setProperty('--theme-color', getComputedStyle(root).getPropertyValue('--original-theme').trim());
   
-  // 添加初始全屏遮罩
-  const originalLayer = document.getElementById("original-layer");
-  if (originalLayer) {
-    // 初始时完全遮蔽原始图层(完全透明)
-    const initialMaskStyle = `radial-gradient(circle at 50% 50%, rgba(0,0,0,0) 0px, rgba(0,0,0,0) 100%)`;
-    originalLayer.style.webkitMask = initialMaskStyle;
-    originalLayer.style.mask = initialMaskStyle;
-    console.log("初始化遮罩已应用，完全透明");
-  }
+  
   
   // 初始化可调整分隔条
   initResizers();
@@ -355,6 +347,11 @@ function initEventListeners(mapData) {
   });
 
   console.log("相机状态监听已设置为 afterRender 事件机制"+"当前模式为"+state.currentLayer);
+
+  // 根据用户需求，初始化后立即切换到 'original' 图层模式
+  const closestZoomLevel = findClosestZoomLevel(0.1, state.zoomThresholds);
+  switchToZoomLevel(closestZoomLevel, mapData);
+  switchLayer('original', mapData);
 }
 
 /**
@@ -394,7 +391,8 @@ async function handleNearbyNodesRequest(x, y, count, mapData) {
   
   try {
     // 获取附近节点数据
-    const data = await fetchNearbyNodesData(x, y, count);
+    const data = await fetchNearbyNod
+    esData(x, y, count);
     console.log(`获取到${data.nodes.length}个附近节点和${data.edges.length}条边`);
     
     // 清除之前的高亮状态

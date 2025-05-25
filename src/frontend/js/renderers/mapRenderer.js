@@ -151,15 +151,8 @@ function initMapRender(data) {
   // 设置初始缩放比例并立即加载聚类视图
   console.log("初始化自动缩放模式，设置初始缩放比例为0.2并加载聚类视图");
   // 设置相机缩放比例为0.2
-  clusterRenderer.getCamera().ratio = 0.2;
-  originalRenderer.getCamera().ratio = 0.2;
-  
-  // 初始化后立即加载聚类视图
-  setTimeout(() => {
-    const closestZoomLevel = findClosestZoomLevel(0.2, state.zoomThresholds);
-    switchToZoomLevel(closestZoomLevel, mapData);
-  }, 100);
-  
+  clusterRenderer.getCamera().ratio = 0.1;
+  originalRenderer.getCamera().ratio = 0.1;
   console.timeEnd('总渲染时间');
   console.log("地图渲染完成");
   

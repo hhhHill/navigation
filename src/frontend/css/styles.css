@@ -6,48 +6,45 @@ html {
 /* 公共样式 */
 :root {
     /* 主题色变量 */
-    --theme-color: #4facfe; /* 默认主题色（混合图层） */
-    --original-theme: #3F51B5; /* 原始图层主题色 - 蓝色系 */
+    --theme-color: #4facfe; /* 默认主题色（浅蓝色）, 同时也是原始图层的基础色 */
+    --original-theme: #4facfe; /* 原始图层主题色 - 显式设置为浅蓝色 */
     --cluster-theme: #4CAF50; /* 集群图层主题色 - 绿色系 */
     --mixed-theme: #9C27B0; /* 混合图层主题色 - 紫色系 */
     
-    /* 主题背景色定义 - 调整为更浅的颜色 */
-    /* 原始图层 */
-    /* --original-sidebar-bg: #1A237E;  深靛蓝 */
-    --original-sidebar-bg: #E8EAF6; /* 浅蓝色 50 */
-    /* --original-panel-bg: #283593;   靛蓝 800 */
-    --original-panel-bg: #C5CAE9; /* 浅蓝色 200 */
-    /* --original-console-bg: #303F9F; 靛蓝 700 */
-    --original-console-bg: #9FA8DA; /* 浅蓝色 300 */
-    /* --original-console-header-bg: #1A237E; 深靛蓝 */
-    --original-console-header-bg: #7986CB; /* 浅蓝色 400 */
+    /* 基于 --theme-color 的浅色/深色变体（用于背景和文本） */
+    --theme-color-light-50: #E0F2F7; /* 浅蓝色 50 */
+    --theme-color-light-200: #B3E5FC; /* 浅蓝色 200 */
+    --theme-color-light-300: #81D4FA; /* 浅蓝色 300 */
+    --theme-color-light-400: #4FC3F7; /* 浅蓝色 400 */
+    --theme-color-dark-700: #0277BD; /* 深蓝色 700 */
+    --theme-color-dark-800: #0288D1; /* 深蓝色 800 */
+    --theme-color-dark-900: #01579B; /* 深蓝色 900 */
+    
+    /* 主题背景色定义 */
+    /* 原始图层 - 使用基于 --theme-color 的变体 */
+    --original-sidebar-bg: var(--theme-color-light-50); 
+    --original-panel-bg: var(--theme-color-light-200); 
+    --original-console-bg: var(--theme-color-light-300); 
+    --original-console-header-bg: var(--theme-color-light-400); 
 
     /* 集群图层 */
-    /* --cluster-sidebar-bg: #1B5E20;   深绿 */
     --cluster-sidebar-bg: #E8F5E9; /* 浅绿色 50 */
-    /* --cluster-panel-bg: #2E7D32;    绿色 800 */
     --cluster-panel-bg: #C8E6C9; /* 浅绿色 200 */
-    /* --cluster-console-bg: #388E3C;   绿色 700 */
     --cluster-console-bg: #A5D6A7; /* 浅绿色 300 */
-    /* --cluster-console-header-bg: #1B5E20; 深绿 */
     --cluster-console-header-bg: #81C784; /* 浅绿色 400 */
 
     /* 混合图层 */
-    /* --mixed-sidebar-bg: #4A148C;    深紫 */
     --mixed-sidebar-bg: #F3E5F5; /* 浅紫色 50 */
-    /* --mixed-panel-bg: #6A1B9A;     紫色 800 */
     --mixed-panel-bg: #E1BEE7; /* 浅紫色 200 */
-    /* --mixed-console-bg: #7B1FA2;    紫色 700 */
     --mixed-console-bg: #CE93D8; /* 浅紫色 300 */
-    /* --mixed-console-header-bg: #4A148C; 深紫 */
     --mixed-console-header-bg: #BA68C8; /* 浅紫色 400 */
 
     /* 主题文本颜色定义 */
-    /* 原始图层文本颜色 */
-    --original-sidebar-text: #283593; /* 深蓝色 - 侧边栏文本 */
-    --original-panel-text: #303F9F;   /* 蓝色 - 功能面板文本 */
-    --original-console-text: #1A237E; /* 深蓝色 - 控制台文本 */
-    --original-heading-text: #3949AB; /* 蓝色 - 标题文本 */
+    /* 原始图层文本颜色 - 使用基于 --theme-color 的深色变体 */
+    --original-sidebar-text: var(--theme-color-dark-800); 
+    --original-panel-text: var(--theme-color-dark-700);   
+    --original-console-text: var(--theme-color-dark-900); 
+    --original-heading-text: var(--theme-color-dark-800); 
     
     /* 集群图层文本颜色 */
     --cluster-sidebar-text: #2E7D32; /* 深绿色 - 侧边栏文本 */

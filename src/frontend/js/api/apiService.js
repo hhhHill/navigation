@@ -14,15 +14,8 @@ async function fetchMapData() {
         throw new Error(`HTTP error fetching detail data: ${detailResponse.status}`);
       }
       const detailData = await detailResponse.json();
-      
-      // 从后端获取概览视图数据
-      const overviewResponse = await fetch('/api/dbscan_clusters');
-      if (!overviewResponse.ok) {
-        throw new Error(`HTTP error fetching overview data: ${overviewResponse.status}`);
-      }
-      const overviewData = await overviewResponse.json();
-      
-      return { detailData, overviewData };
+      return {detailData};
+
     } catch (error) {
       console.error("获取地图数据失败:", error);
       document.querySelector(".loading").textContent = "加载地图数据失败，请刷新重试";
@@ -53,6 +46,7 @@ async function fetchZoomClusterData(zoomLevel) {
     console.log(`获取缩放等级 ${zoomLevel} 的聚类数据 (映射到 ${closestZoomLevel})`);
     
     // 使用查询参数获取缩放等级数据
+    // const response = await fetch(`/api/zoom_clusters?zoom_level=${zoomLevel}`);
     const response = await fetch(`/api/zoom_clusters?zoom_level=${zoomLevel}`);
     if (!response.ok) {
       throw new Error(`HTTP error fetching zoom cluster data: ${response.status}`);
