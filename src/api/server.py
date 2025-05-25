@@ -198,6 +198,11 @@ def quadtree_viz_page():
     """提供四叉树可视化页面"""
     return send_from_directory(os.path.join(app.static_folder, 'html'), 'quadtree.html')
 
+@app.route('/')
+def index_page():
+    """提供index页面"""
+    return send_from_directory(os.path.join(os.path.dirname(__file__), '..', 'home', 'html'), 'index.html')
+
 @app.route('/map')
 def index():
     """提供前端页面"""

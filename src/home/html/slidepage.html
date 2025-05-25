@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D层次轮播展示</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #f0f0f0;
+        }
+
+        .slider-container {
+            width: 90vw;
+            height: 70vh;
+            max-width: 1400px;
+            position: relative;
+            overflow: visible;
+        }
+
+        .slider {
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+
+        .slide {
+            position: absolute;
+            width: 45%;
+            height: 80%;
+            border-radius: 20px;
+            overflow: hidden;
+            transition: all 1s cubic-bezier(0.645, 0.045, 0.355, 1);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+            transform: translateX(-50%) scale(0.7);
+            left: 50%;
+        }
+
+        .slide img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: all 1s cubic-bezier(0.645, 0.045, 0.355, 1);
+        }
+
+        /* 当前位置 */
+        .slide.current {
+            transform: translateX(-50%) scale(1);
+            left: 50%;
+            z-index: 3;
+            opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
+        }
+
+        .slide.current img {
+            filter: brightness(1);
+        }
+
+        /* 左侧位置 */
+        .slide.prev {
+            transform: translateX(-95%) scale(0.85);
+            left: 50%;
+            z-index: 2;
+            opacity: 1;
+            visibility: visible;
+            pointer-events: none;
+        }
+
+        .slide.prev img {
+            filter: brightness(0.6) blur(4px);
+        }
+
+        /* 右侧位置 */
+        .slide.next {
+            transform: translateX(-5%) scale(0.85);
+            left: 50%;
+            z-index: 2;
+            opacity: 1;
+            visibility: visible;
+            pointer-events: none;
+        }
+
+        .slide.next img {
+            filter: brightness(0.6) blur(4px);
+        }
+
+        /* 其他位置的图片完全隐藏 */
+        .slide:not(.current):not(.prev):not(.next) {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+            transform: translateX(-50%) scale(0);
+        }
+
+        .slider-controls {
+            position: absolute;
+            bottom: -50px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 12px;
+            z-index: 4;
+        }
+
+        .slider-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background-color: rgba(0, 0, 0, 0.2);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .slider-dot.active {
+            background-color: #333;
+            transform: scale(1.2);
+        }
+
+        .slider-btn {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            background-color: rgba(255, 255, 255, 0.9);
+            border: none;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            color: #333;
+            transition: all 0.3s ease;
+            z-index: 4;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .slider-btn:hover {
+            background-color: white;
+            transform: translateY(-50%) scale(1.1);
+        }
+
+        .prev-btn {
+            left: 2%;
+        }
+
+        .next-btn {
+            right: 2%;
+        }
+    </style>
+</head>
+<body>
+    <div class="slider-container">
+        <div class="slider">
+            <div class="slide">
+                <img src="https://picsum.photos/800/1000?random=1" alt="图片1">
+            </div>
+            <div class="slide">
+                <img src="https://picsum.photos/800/1000?random=2" alt="图片2">
+            </div>
+            <div class="slide">
+                <img src="https://picsum.photos/800/1000?random=3" alt="图片3">
+            </div>
+            <div class="slide">
+                <img src="https://picsum.photos/800/1000?random=4" alt="图片4">
+            </div>
+            <div class="slide">
+                <img src="https://picsum.photos/800/1000?random=5" alt="图片5">
+            </div>
+        </div>
+        
+        <button class="slider-btn prev-btn">←</button>
+        <button class="slider-btn next-btn">→</button>
+        
+        <div class="slider-controls">
+            <div class="slider-dot active"></div>
+            <div class="slider-dot"></div>
+            <div class="slider-dot"></div>
+            <div class="slider-dot"></div>
+            <div class="slider-dot"></div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const slides = document.querySelectorAll('.slide');
+            const dots = document.querySelectorAll('.slider-dot');
+            const prevBtn = document.querySelector('.prev-btn');
+            const nextBtn = document.querySelector('.next-btn');
+            const sliderContainer = document.querySelector('.slider-container');
+            
+            let currentIndex = 0;
+            const slideCount = slides.length;
+            
+            const autoPlayInterval = 3000;
+            let autoPlayTimer;
+            let isTransitioning = false;
+
+            function updateSlidePositions() {
+                if (isTransitioning) return;
+                isTransitioning = true;
+
+                slides.forEach((slide, index) => {
+                    // 先移除所有类
+                    slide.className = 'slide';
+                    
+                    // 只给当前、前一张和后一张添加对应的类
+                    if (index === currentIndex) {
+                        slide.classList.add('current');
+                    } else if (index === getPrevIndex()) {
+                        slide.classList.add('prev');
+                    } else if (index === getNextIndex()) {
+                        slide.classList.add('next');
+                    }
+                    // 其他图片会自动应用默认样式（完全隐藏）
+                });
+
+                dots.forEach((dot, index) => {
+                    dot.classList.toggle('active', index === currentIndex);
+                });
+
+                setTimeout(() => {
+                    isTransitioning = false;
+                }, 1000);
+            }
+
+            function getPrevIndex() {
+                return (currentIndex - 1 + slideCount) % slideCount;
+            }
+
+            function getNextIndex() {
+                return (currentIndex + 1) % slideCount;
+            }
+
+            function nextSlide() {
+                if (isTransitioning) return;
+                currentIndex = getNextIndex();
+                updateSlidePositions();
+            }
+
+            function prevSlide() {
+                if (isTransitioning) return;
+                currentIndex = getPrevIndex();
+                updateSlidePositions();
+            }
+
+            // 点击导航点切换
+            dots.forEach((dot, index) => {
+                dot.addEventListener('click', () => {
+                    if (isTransitioning || currentIndex === index) return;
+                    currentIndex = index;
+                    updateSlidePositions();
+                    resetAutoPlay();
+                });
+            });
+
+            // 点击按钮切换
+            prevBtn.addEventListener('click', () => {
+                prevSlide();
+                resetAutoPlay();
+            });
+
+            nextBtn.addEventListener('click', () => {
+                nextSlide();
+                resetAutoPlay();
+            });
+
+            // 自动播放功能
+            function startAutoPlay() {
+                autoPlayTimer = setInterval(nextSlide, autoPlayInterval);
+            }
+
+            function resetAutoPlay() {
+                clearInterval(autoPlayTimer);
+                startAutoPlay();
+            }
+
+            // 鼠标悬停时暂停自动播放
+            sliderContainer.addEventListener('mouseenter', () => {
+                clearInterval(autoPlayTimer);
+            });
+
+            sliderContainer.addEventListener('mouseleave', () => {
+                startAutoPlay();
+            });
+
+            // 触摸设备支持
+            let touchStartX = 0;
+            let touchEndX = 0;
+
+            sliderContainer.addEventListener('touchstart', (e) => {
+                touchStartX = e.touches[0].clientX;
+                clearInterval(autoPlayTimer);
+            }, { passive: true });
+
+            sliderContainer.addEventListener('touchmove', (e) => {
+                touchEndX = e.touches[0].clientX;
+            }, { passive: true });
+
+            sliderContainer.addEventListener('touchend', () => {
+                const difference = touchStartX - touchEndX;
+                if (Math.abs(difference) > 50) {
+                    if (difference > 0) {
+                        nextSlide();
+                    } else {
+                        prevSlide();
+                    }
+                }
+                startAutoPlay();
+            });
+
+            // 初始化显示
+            updateSlidePositions();
+            startAutoPlay();
+        });
+    </script>
+</body>
+</html>
