@@ -284,9 +284,6 @@ async function switchToZoomLevel(zoomLevel, mapData) {
   try {
     console.time(`切换到缩放等级 ${zoomLevel}`);
 
-    // 其他缩放等级下，聚类图层完全可见，原始图层半透明
-    document.getElementById("cluster-layer").style.opacity = "1";
-    document.getElementById("original-layer").style.opacity = "1";
     
     // 检查缓存中是否已有该等级的数据
     if (!state.zoomData[zoomLevel]) {

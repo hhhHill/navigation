@@ -6,6 +6,48 @@ import { highlightNearbyNodes, resetNodeAndEdgeColors } from './nodeHandler.js';
 import { showLoadingMessage, showResultMessage, showErrorMessage, removeElement, updateScaleInfo, addConsoleMessage } from './uiUtils.js';
 import { switchToZoomLevel} from '../renderers/mapRenderer.js';
 
+// 全局调整Sigma.js渲染器尺寸的函数，便于多处共享
+function resizeSigmaRenderers() {
+  if (window.mapData && window.mapData.clusterRenderer && window.mapData.originalRenderer) {
+    const clusterRenderer = window.mapData.clusterRenderer;
+    const originalRenderer = window.mapData.originalRenderer;
+    const mapContainer = document.getElementById('map-container');
+    
+    // 确保容器存在
+    if (!mapContainer) return;
+    
+    // 获取容器和画布
+    const clusterDom = clusterRenderer.getContainer();
+    const originalDom = originalRenderer.getContainer();
+    const mapWidth = mapContainer.offsetWidth;
+    const mapHeight = mapContainer.offsetHeight;
+    
+    // 触发全局尺寸调整事件
+    const resizeEvent = new Event('resize');
+    window.dispatchEvent(resizeEvent);
+    
+    // 调整集群图层的尺寸
+    if (clusterDom) {
+      const canvas = clusterDom.querySelector('canvas');
+      if (canvas) {
+        canvas.width = mapWidth;
+        canvas.height = mapHeight;
+      }
+    }
+    
+    // 调整原始图层的尺寸
+    if (originalDom) {
+      const canvas = originalDom.querySelector('canvas');
+      if (canvas) {
+        canvas.width = mapWidth;
+        canvas.height = mapHeight;
+      }
+    }
+    
+    console.log(`渲染器大小已调整为 ${mapWidth}x${mapHeight}`);
+  }
+}
+
 /**
  * 初始化事件监听器
  * @param {Object} mapData - 包含clusterGraph、originalGraph、clusterRenderer、originalRenderer、container和state的对象
@@ -18,6 +60,14 @@ function initEventListeners(mapData) {
   
   // 初始化地图实况查看开关状态
   state.mapLiveActive = false;
+  // 初始化当前图层类型，支持三种模式：'mixed'(混合), 'original'(原始), 'cluster'(集群)
+  state.currentLayer = 'original';
+  state.lastOriginalCameraState = originalRenderer.getCamera().getState();
+  state.lastClusterCameraState = clusterRenderer.getCamera().getState();
+  
+  // 设置初始原始图层主题色
+  const root = document.documentElement;
+  root.style.setProperty('--theme-color', getComputedStyle(root).getPropertyValue('--original-theme').trim());
   
   // 添加初始全屏遮罩
   const originalLayer = document.getElementById("original-layer");
@@ -32,36 +82,39 @@ function initEventListeners(mapData) {
   // 初始化可调整分隔条
   initResizers();
   
-
+  // 初始化侧边栏切换功能
+  initSidebarToggle();
+  
   // 绑定查看地图实况按钮事件
   const mapLiveBtn = document.getElementById("mapLive");
   if (mapLiveBtn) {
+    // 设置初始状态
+    mapLiveBtn.textContent = '切换图层: 原始';
+    mapLiveBtn.classList.add('active');
+    
     mapLiveBtn.addEventListener('click', function() {
-      state.mapLiveActive = !state.mapLiveActive;
-      
-      if (state.mapLiveActive) {
-        // 激活状态：原始图层部分可见
-        const activeMaskStyle = `radial-gradient(circle at 50% 50%, rgba(0,0,0,0.2) 0px, rgba(0,0,0,0.2) 100%)`;
-        originalLayer.style.webkitMask = activeMaskStyle;
-        originalLayer.style.mask = activeMaskStyle;
-        mapLiveBtn.classList.add('active');
-        mapLiveBtn.textContent = '关闭地图实况';
-        console.log("地图实况查看已启用");
-        
-        // 添加到控制台
-        addConsoleMessage("地图实况查看已启用");
-      } else {
-        // 关闭状态：原始图层完全透明
-        const inactiveMaskStyle = `radial-gradient(circle at 50% 50%, rgba(0,0,0,0) 0px, rgba(0,0,0,0) 100%)`;
-        originalLayer.style.webkitMask = inactiveMaskStyle;
-        originalLayer.style.mask = inactiveMaskStyle;
-        mapLiveBtn.classList.remove('active');
-        mapLiveBtn.textContent = '查看地图实况';
-        console.log("地图实况查看已禁用");
-        
-        // 添加到控制台
-        addConsoleMessage("地图实况查看已禁用");
+      // 三种图层类型切换：mixed -> original -> cluster -> mixed
+      switch(state.currentLayer) {
+        case 'mixed':
+          state.currentLayer = 'original';
+          switchLayer('original', mapData);
+          mapLiveBtn.textContent = '切换图层: 原始';
+          break;
+        case 'original':
+          state.currentLayer = 'cluster';
+          switchLayer('cluster', mapData);
+          mapLiveBtn.textContent = '切换图层: 集群';
+          break;
+        case 'cluster':
+        default:
+          state.currentLayer = 'mixed';
+          switchLayer('mixed', mapData);
+          mapLiveBtn.textContent = '切换图层: 混合';
+          break;
       }
+      
+      // 添加到控制台
+      addConsoleMessage(`已切换到${state.currentLayer === 'mixed' ? '混合' : (state.currentLayer === 'original' ? '原始' : '集群')}图层`);
     });
   }
   
@@ -124,59 +177,8 @@ function initEventListeners(mapData) {
   // 初始化双击处理相关变量
   let lastClickTime = 0;
   const doubleClickDelay = 1000; // 毫秒
-
-  // 点击节点事件（用于双击检测）
-  clusterRenderer.on("clickNode", function(event) {
-    const nodeId = event.node;
-    const currentTime = new Date().getTime();
-    
-    // 双击检测
-    if (currentTime - lastClickTime < doubleClickDelay) {
-      console.log("节点双击事件:", nodeId);
-      
-      // 获取节点的坐标信息
-      const nodeAttributes = clusterGraph.getNodeAttributes(nodeId);
-      const x = nodeAttributes.x;
-      const y = nodeAttributes.y;
-      
-      // 获取附近节点
-      handleNearbyNodesRequest(x, y, 100, mapData);
-    }
-    
-    lastClickTime = currentTime;
-  });
-
   // 保存边的原始颜色
   state.originalEdgeColors = {};
-
-  // // 边事件处理
-  // originalRenderer.on("enterEdge", ({ edge }) => {
-  //   // console.log("进入边事件触发:", edge);
-    
-  //   // 存储原始颜色（如果尚未存储）
-  //   if (!state.originalEdgeColors[edge]) {
-  //     state.originalEdgeColors[edge] = originalGraph.getEdgeAttribute(edge, "color") || COLORS.ORIGINAL_EDGE;
-  //   }
-    
-  //   // 改变边的颜色为高亮色并完全不透明
-  //   originalGraph.setEdgeAttribute(edge, "color", "rgb(0, 72, 255)"); // 纯红色，完全不透明
-  //   originalGraph.setEdgeAttribute(edge, "size", 12); // 增加边的大小使其更明显
-  //   originalGraph.setEdgeAttribute(edge, "zIndex", 20); // 设置非常高的z-index确保在最上层
-  //   originalRenderer.refresh();
-  // });
-
-  // originalRenderer.on("leaveEdge", ({ edge }) => {
-  //   // console.log("离开边事件触发:", edge);
-    
-  //   // 恢复边的原始颜色
-  //   if (state.originalEdgeColors[edge]) {
-  //     originalGraph.setEdgeAttribute(edge, "color", state.originalEdgeColors[edge]);
-  //     originalGraph.setEdgeAttribute(edge, "size", 3);
-  //     originalGraph.setEdgeAttribute(edge, "zIndex", 0); // 恢复默认zIndex
-  //     originalRenderer.refresh();
-  //   }
-  // });
-
   // 添加边点击事件
   originalRenderer.on("clickEdge", ({ edge }) => {
     console.log("边被点击:", edge);
@@ -269,98 +271,90 @@ function initEventListeners(mapData) {
     state.cameraPollingInterval = null;
   }
   
-  // 替代轮询的相机状态监视函数
-  function handleCameraStateChange(newState) {
-    // 验证相机状态有效性
-    if (!newState || typeof newState !== 'object') {
-      console.warn("收到无效的相机状态", newState);
-      return;
-    }
-    
-    try {
-      // 处理缩放比例变化，判断是否需要限制平移
-      if (newState.ratio < 1) {
-        if (state.hasPanLimitation) {
-          console.log("重新启用平移功能");
-          
-          const originalDomElement = originalRenderer.getContainer();
-          // 移除之前添加的事件监听器
-          originalDomElement.removeEventListener('mousedown', state.panLimitHandlers.mousedownHandler, false);
-          originalDomElement.removeEventListener('touchstart', state.panLimitHandlers.touchstartHandler, false);
-          originalDomElement.removeEventListener('mousemove', state.panLimitHandlers.mousemoveHandler, false);
-          originalDomElement.removeEventListener('touchmove', state.panLimitHandlers.touchmoveHandler, false);
-          
-          state.hasPanLimitation = false;
-        }
-      }
-      if (newState.ratio >= 1 && !state.hasPanLimitation) {
-        // 阻止鼠标和触摸事件导致的平移
-        console.log("阻止鼠标和触摸事件导致的平移");
-        
+  originalRenderer.on("afterRender", function() {
+    const currentOriginalCamera = originalRenderer.getCamera().getState();
+
+    // --- 平移/缩放限制逻辑 (始终基于originalRenderer) ---
+    if (currentOriginalCamera.ratio < 1) {
+      if (state.hasPanLimitation) {
+        console.log("重新启用平移功能");
         const originalDomElement = originalRenderer.getContainer();
-        originalDomElement.addEventListener('mousedown', state.panLimitHandlers.mousedownHandler, false);
-        originalDomElement.addEventListener('touchstart', state.panLimitHandlers.touchstartHandler, false);
-        originalDomElement.addEventListener('mousemove', state.panLimitHandlers.mousemoveHandler, false);
-        originalDomElement.addEventListener('touchmove', state.panLimitHandlers.touchmoveHandler, false);
+        originalDomElement.removeEventListener('mousedown', state.panLimitHandlers.mousedownHandler, false);
+        originalDomElement.removeEventListener('touchstart', state.panLimitHandlers.touchstartHandler, false);
+        originalDomElement.removeEventListener('mousemove', state.panLimitHandlers.mousemoveHandler, false);
+        originalDomElement.removeEventListener('touchmove', state.panLimitHandlers.touchmoveHandler, false);
+        state.hasPanLimitation = false;
+      }
+    }
+    if (currentOriginalCamera.ratio >= 1 && !state.hasPanLimitation) {
+      console.log("阻止鼠标和触摸事件导致的平移");
+      const originalDomElement = originalRenderer.getContainer();
+      originalDomElement.addEventListener('mousedown', state.panLimitHandlers.mousedownHandler, false);
+      originalDomElement.addEventListener('touchstart', state.panLimitHandlers.touchstartHandler, false);
+      originalDomElement.addEventListener('mousemove', state.panLimitHandlers.mousemoveHandler, false);
+      originalDomElement.addEventListener('touchmove', state.panLimitHandlers.touchmoveHandler, false);
+      state.hasPanLimitation = true;
+    }
+    // --- 结束 平移/缩放限制逻辑 ---
+
+    if (state.currentLayer === 'mixed') {
+      const lastOriginalCamera = state.lastOriginalCameraState || {};
+      if (currentOriginalCamera.ratio !== lastOriginalCamera.ratio ||
+          currentOriginalCamera.x !== lastOriginalCamera.x ||
+          currentOriginalCamera.y !== lastOriginalCamera.y) {
         
-        state.hasPanLimitation = true;
-      }
-      
-      // 从原始图层同步到集群图层
-      const clusterCamera = clusterRenderer.getCamera();
-      if (typeof newState.x === 'number' && !isNaN(newState.x)) {
-        clusterCamera.x = newState.x;
-      }
-      if (typeof newState.y === 'number' && !isNaN(newState.y)) {
-        clusterCamera.y = newState.y;
-      }
-      if (typeof newState.ratio === 'number' && !isNaN(newState.ratio)) {
-        clusterCamera.ratio = newState.ratio;
-      }
-      clusterRenderer.refresh(); // 刷新集群图层
-      console.log("clusterRenderer.refresh() 已调用"); // 添加日志
-      
-      // 更新缩放比例显示
-      if (mapData.scaleInfo && typeof newState.ratio === 'number' && !isNaN(newState.ratio)) {
-        updateScaleInfo(mapData.scaleInfo, newState.ratio);
-      }
-      
-      // 找到最接近的预定义缩放等级
-      if (typeof newState.ratio === 'number' && !isNaN(newState.ratio)) {
-        const closestZoomLevel = findClosestZoomLevel(newState.ratio, state.zoomThresholds);
-        // 如果缩放等级发生变化，切换到相应的聚类视图
+        state.lastOriginalCameraState = {...currentOriginalCamera};
+
+        // 从原始图层同步到集群图层
+        const clusterCamera = clusterRenderer.getCamera();
+        clusterCamera.x = currentOriginalCamera.x;
+        clusterCamera.y = currentOriginalCamera.y;
+        clusterCamera.ratio = currentOriginalCamera.ratio;
+        clusterRenderer.refresh();
+        console.log("混合图层模式: 相机同步已执行");
+
+        // 更新缩放比例显示
+        if (mapData.scaleInfo) {
+          updateScaleInfo(mapData.scaleInfo, currentOriginalCamera.ratio);
+        }
+
+        // 找到最接近的预定义缩放等级并切换
+        const closestZoomLevel = findClosestZoomLevel(currentOriginalCamera.ratio, state.zoomThresholds);
         if (state.currentZoomLevel !== closestZoomLevel) {
-          console.log(`缩放等级变化: ${state.currentZoomLevel} -> ${closestZoomLevel}`);
+          console.log(`缩放等级变化 (mixed): ${state.currentZoomLevel} -> ${closestZoomLevel}`);
           switchToZoomLevel(closestZoomLevel, mapData);
         }
       }
-      
-      // 更新保存的相机状态（深拷贝以避免引用问题）
-      state.lastCameraState = {...newState};
-    } catch (error) {
-      console.error("处理相机状态变化时出错:", error);
-    }
-  }
-
-  // 使用 afterRender 事件替代轮询机制来监听相机状态变化
-  originalRenderer.on("afterRender", function() {
-    const currentState = originalRenderer.getCamera().getState();
-    const lastState = state.lastCameraState || {};
-
-    // 验证相机状态有效性
-    if (!currentState || typeof currentState !== 'object') {
-      return;
-    }
-
-    // 检查相机状态是否发生变化
-    if (currentState.ratio !== lastState.ratio ||
-        currentState.x !== lastState.x ||
-        currentState.y !== lastState.y) {
-      handleCameraStateChange(currentState);
     }
   });
 
-  console.log("相机状态监听已设置为 afterRender 事件机制");
+  clusterRenderer.on("afterRender", function() {
+    if (state.currentLayer === 'cluster') {
+      const currentClusterCamera = clusterRenderer.getCamera().getState();
+      const lastClusterCamera = state.lastClusterCameraState || {};
+
+      if (currentClusterCamera.ratio !== lastClusterCamera.ratio ||
+          currentClusterCamera.x !== lastClusterCamera.x ||
+          currentClusterCamera.y !== lastClusterCamera.y) {
+
+        state.lastClusterCameraState = {...currentClusterCamera};
+
+        // 更新缩放比例显示
+        if (mapData.scaleInfo) {
+          updateScaleInfo(mapData.scaleInfo, currentClusterCamera.ratio);
+        }
+
+        // 找到最接近的预定义缩放等级并切换
+        const closestZoomLevel = findClosestZoomLevel(currentClusterCamera.ratio, state.zoomThresholds);
+        if (state.currentZoomLevel !== closestZoomLevel) {
+          console.log(`缩放等级变化 (cluster): ${state.currentZoomLevel} -> ${closestZoomLevel}`);
+          switchToZoomLevel(closestZoomLevel, mapData);
+        }
+      }
+    }
+  });
+
+  console.log("相机状态监听已设置为 afterRender 事件机制"+"当前模式为"+state.currentLayer);
 }
 
 /**
@@ -412,7 +406,6 @@ async function handleNearbyNodesRequest(x, y, count, mapData) {
     // highlightNearbyNodes(clusterGraph, data.nodes, data.edges);
     highlightNearbyNodes(originalGraph, data.nodes, data.edges);
     
-    clusterRenderer.refresh();
     originalRenderer.refresh();
     console.log("handleNearbyNodesRequest: clusterRenderer.refresh() and originalRenderer.refresh() called"); // 添加日志
     
@@ -450,42 +443,7 @@ function initResizers() {
   let startHeight = 0;
   let startBottomHeight = 0;
   
-  // 创建Sigma.js渲染器尺寸调整函数
-  const resizeSigmaRenderers = function() {
-    if (window.mapData && window.mapData.clusterRenderer && window.mapData.originalRenderer) {
-      const clusterRenderer = window.mapData.clusterRenderer;
-      const originalRenderer = window.mapData.originalRenderer;
-      
-      // 获取容器和画布
-      const clusterDom = clusterRenderer.getContainer();
-      const originalDom = originalRenderer.getContainer();
-      const mapWidth = mapContainer.offsetWidth;
-      const mapHeight = mapContainer.offsetHeight;
-      
-      // 触发全局尺寸调整事件
-      const resizeEvent = new Event('resize');
-      window.dispatchEvent(resizeEvent);
-      
-      // 调整集群图层的尺寸
-      if (clusterDom) {
-        const canvas = clusterDom.querySelector('canvas');
-        if (canvas) {
-          canvas.width = mapWidth;
-          canvas.height = mapHeight;
-        }
-      }
-      
-      // 调整原始图层的尺寸
-      if (originalDom) {
-        const canvas = originalDom.querySelector('canvas');
-        if (canvas) {
-          canvas.width = mapWidth;
-          canvas.height = mapHeight;
-        }
-      }
-      
-    }
-  };
+  // 注意：resizeSigmaRenderers已经被移到全局作用域
   
   const onMouseDown = function(e) {
     // 记录初始位置和高度
@@ -532,6 +490,7 @@ function initResizers() {
     // 移除频繁的渲染器尺寸更新调用以避免卡顿
     // console.log("更新渲染器大小");
     // resizeSigmaRenderers();
+
     
     e.preventDefault();
   };
@@ -548,13 +507,13 @@ function initResizers() {
     
     // 拖动结束后更新渲染器尺寸
     console.log("拖动结束，更新渲染器大小");
-    resizeSigmaRenderers();
+    resizeSigmaRenderers(); // 使用全局函数
     
     // 手动触发渲染器刷新以确保图谱正确显示
     if (window.mapData && window.mapData.clusterRenderer && window.mapData.originalRenderer) {
       window.mapData.clusterRenderer.refresh();
       window.mapData.originalRenderer.refresh();
-      console.log("Sigma.js 渲染器已刷新 (拖动结束)"); // 添加日志
+      console.log("Sigma.js 渲染器已刷新 (拖动结束)");
     }
     
     // 记录到控制台
@@ -573,11 +532,184 @@ function initResizers() {
     mainResizer.style.top = '60%';
     
     // 更新渲染器大小
-    resizeSigmaRenderers();
+    resizeSigmaRenderers(); // 使用全局函数
     
     // 记录到控制台
     addConsoleMessage('区域大小已重置为默认比例 60:40');
   });
 }
 
-export { initEventListeners, handleNearbyNodesRequest }; 
+/**
+ * 初始化侧边栏切换功能
+ */
+function initSidebarToggle() {
+  const toggleBtn = document.getElementById('toggle-sidebar');
+  const showBtn = document.getElementById('show-sidebar');
+  const sidebar = document.querySelector('.app-sidebar');
+  const mainContent = document.querySelector('.app-main');
+  
+  if (!toggleBtn || !showBtn || !sidebar || !mainContent) {
+    console.error('找不到侧边栏切换所需的DOM元素');
+    return;
+  }
+  
+  // 点击隐藏侧边栏按钮
+  toggleBtn.addEventListener('click', function() {
+    sidebar.classList.add('hidden');
+    mainContent.classList.add('full-width');
+    
+    // 显示"显示侧边栏"按钮
+    showBtn.style.display = 'flex';
+    
+    // 添加到控制台
+    addConsoleMessage('侧边栏已隐藏');
+    
+    // 触发窗口调整事件以确保所有元素正确调整大小
+    window.dispatchEvent(new Event('resize'));
+    
+    // 调整渲染器大小
+    setTimeout(() => {
+      resizeSigmaRenderers(); // 使用全局函数
+      
+      if (window.mapData && window.mapData.clusterRenderer && window.mapData.originalRenderer) {
+        // 刷新渲染器
+        window.mapData.clusterRenderer.refresh();
+        window.mapData.originalRenderer.refresh();
+        console.log("隐藏侧边栏后刷新渲染器");
+      }
+    }, 300); // 等待过渡动画完成
+  });
+  
+  // 点击显示侧边栏按钮
+  showBtn.addEventListener('click', function() {
+    sidebar.classList.remove('hidden');
+    mainContent.classList.remove('full-width');
+    
+    // 隐藏"显示侧边栏"按钮
+    showBtn.style.display = 'none';
+    
+    // 添加到控制台
+    addConsoleMessage('侧边栏已显示');
+    
+    // 触发窗口调整事件以确保所有元素正确调整大小
+    window.dispatchEvent(new Event('resize'));
+    
+    // 调整渲染器大小
+    setTimeout(() => {
+      resizeSigmaRenderers(); // 使用全局函数
+      
+      if (window.mapData && window.mapData.clusterRenderer && window.mapData.originalRenderer) {
+        // 刷新渲染器
+        window.mapData.clusterRenderer.refresh();
+        window.mapData.originalRenderer.refresh();
+        console.log("显示侧边栏后刷新渲染器");
+      }
+    }, 300); // 等待过渡动画完成
+  });
+}
+
+/**
+ * 切换图层显示模式
+ * @param {string} layerType - 图层类型，可选值: 'mixed', 'original', 'cluster'
+ * @param {Object} mapData - 地图数据对象
+ */
+function switchLayer(layerType, mapData) {
+  const { originalGraph, clusterGraph, originalRenderer, clusterRenderer, state } = mapData;
+  const originalLayer = document.getElementById("original-layer");
+  const clusterLayer = originalRenderer.getContainer().parentElement.querySelector(':scope > div:not(#original-layer)');
+  const root = document.documentElement; // 获取根元素，用于设置CSS变量
+  
+  if (!originalLayer || !clusterLayer) {
+    console.error("找不到图层容器元素");
+    return;
+  }
+  
+  state.mapLiveActive = false;
+  
+  switch(layerType) {
+    case 'original':
+      originalLayer.style.opacity = "1";
+      originalLayer.style.webkitMask = "none";
+      originalLayer.style.mask = "none";
+      originalLayer.style.zIndex = "10";
+      clusterLayer.style.display = "none";
+      clusterLayer.style.zIndex = "5";
+      state.lastOriginalCameraState = originalRenderer.getCamera().getState();
+      originalRenderer.refresh();
+      
+      // 设置原始图层主题色和背景色
+      root.style.setProperty('--theme-color', getComputedStyle(root).getPropertyValue('--original-theme').trim());
+      root.style.setProperty('--current-sidebar-bg', getComputedStyle(root).getPropertyValue('--original-sidebar-bg').trim());
+      root.style.setProperty('--current-panel-bg', getComputedStyle(root).getPropertyValue('--original-panel-bg').trim());
+      root.style.setProperty('--current-console-bg', getComputedStyle(root).getPropertyValue('--original-console-bg').trim());
+      root.style.setProperty('--current-console-header-bg', getComputedStyle(root).getPropertyValue('--original-console-header-bg').trim());
+      
+      // 设置原始图层文本颜色
+      root.style.setProperty('--current-sidebar-text', getComputedStyle(root).getPropertyValue('--original-sidebar-text').trim());
+      root.style.setProperty('--current-panel-text', getComputedStyle(root).getPropertyValue('--original-panel-text').trim());
+      root.style.setProperty('--current-console-text', getComputedStyle(root).getPropertyValue('--original-console-text').trim());
+      root.style.setProperty('--current-heading-text', getComputedStyle(root).getPropertyValue('--original-heading-text').trim());
+      break;
+      
+    case 'cluster':
+      originalLayer.style.opacity = "0";
+      originalLayer.style.zIndex = "5";
+      clusterLayer.style.display = "block";
+      clusterLayer.style.zIndex = "10";
+      state.lastClusterCameraState = clusterRenderer.getCamera().getState();
+      clusterRenderer.refresh();
+      
+      // 设置集群图层主题色和背景色
+      root.style.setProperty('--theme-color', getComputedStyle(root).getPropertyValue('--cluster-theme').trim());
+      root.style.setProperty('--current-sidebar-bg', getComputedStyle(root).getPropertyValue('--cluster-sidebar-bg').trim());
+      root.style.setProperty('--current-panel-bg', getComputedStyle(root).getPropertyValue('--cluster-panel-bg').trim());
+      root.style.setProperty('--current-console-bg', getComputedStyle(root).getPropertyValue('--cluster-console-bg').trim());
+      root.style.setProperty('--current-console-header-bg', getComputedStyle(root).getPropertyValue('--cluster-console-header-bg').trim());
+      
+      // 设置集群图层文本颜色
+      root.style.setProperty('--current-sidebar-text', getComputedStyle(root).getPropertyValue('--cluster-sidebar-text').trim());
+      root.style.setProperty('--current-panel-text', getComputedStyle(root).getPropertyValue('--cluster-panel-text').trim());
+      root.style.setProperty('--current-console-text', getComputedStyle(root).getPropertyValue('--cluster-console-text').trim());
+      root.style.setProperty('--current-heading-text', getComputedStyle(root).getPropertyValue('--cluster-heading-text').trim());
+      break;
+      
+    case 'mixed':
+    default:
+      state.mapLiveActive = true;
+      originalLayer.style.opacity = "1";
+      originalLayer.style.zIndex = "10";
+      clusterLayer.style.display = "block";
+      clusterLayer.style.zIndex = "5";
+      const activeMaskStyle = `radial-gradient(circle at 50% 50%, rgba(0,0,0,0.2) 0px, rgba(0,0,0,0.2) 100%)`;
+      originalLayer.style.webkitMask = activeMaskStyle;
+      originalLayer.style.mask = activeMaskStyle;
+      state.lastOriginalCameraState = originalRenderer.getCamera().getState();
+      // Ensure cluster camera is initially synced in mixed mode if just switched to it
+      const currentOriginalCam = originalRenderer.getCamera().getState();
+      const cCam = clusterRenderer.getCamera();
+      cCam.x = currentOriginalCam.x;
+      cCam.y = currentOriginalCam.y;
+      cCam.ratio = currentOriginalCam.ratio;
+      originalRenderer.refresh();
+      clusterRenderer.refresh();
+      
+      // 设置混合图层主题色和背景色
+      root.style.setProperty('--theme-color', getComputedStyle(root).getPropertyValue('--mixed-theme').trim());
+      root.style.setProperty('--current-sidebar-bg', getComputedStyle(root).getPropertyValue('--mixed-sidebar-bg').trim());
+      root.style.setProperty('--current-panel-bg', getComputedStyle(root).getPropertyValue('--mixed-panel-bg').trim());
+      root.style.setProperty('--current-console-bg', getComputedStyle(root).getPropertyValue('--mixed-console-bg').trim());
+      root.style.setProperty('--current-console-header-bg', getComputedStyle(root).getPropertyValue('--mixed-console-header-bg').trim());
+      
+      // 设置混合图层文本颜色
+      root.style.setProperty('--current-sidebar-text', getComputedStyle(root).getPropertyValue('--mixed-sidebar-text').trim());
+      root.style.setProperty('--current-panel-text', getComputedStyle(root).getPropertyValue('--mixed-panel-text').trim());
+      root.style.setProperty('--current-console-text', getComputedStyle(root).getPropertyValue('--mixed-console-text').trim());
+      root.style.setProperty('--current-heading-text', getComputedStyle(root).getPropertyValue('--mixed-heading-text').trim());
+      break;
+  }
+  
+  console.log(`已切换到${layerType}图层模式`);
+  addConsoleMessage(`已切换到${layerType === 'original' ? '原始' : (layerType === 'cluster' ? '集群' : '混合')}图层模式，主题色已更新`);
+}
+
+export { initEventListeners, handleNearbyNodesRequest, switchLayer }; 

@@ -5,12 +5,19 @@ import { fetchMapData } from '../api/apiService.js';
 import { initMapRender } from '../renderers/mapRenderer.js';
 import { initEventListeners} from '../utils/eventHandlers.js';
 import { createScaleInfo, createControlButton } from '../utils/uiUtils.js';
+import { generateSidebar } from '../utils/sidebar.js';
 
 /**
  * 初始化应用程序
  */
 async function initApp() {
   try {
+    // 加载并插入侧边栏
+    const sidebarContainer = document.getElementById('sidebar-container');
+    if (sidebarContainer) {
+      sidebarContainer.innerHTML = generateSidebar('map');
+    }
+
     // 获取地图数据
     const data = await fetchMapData();
     
