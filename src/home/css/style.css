@@ -1,0 +1,68 @@
+/* 标题动画效果 */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translate3d(0, 30px, 0);
+    }
+    to {
+        opacity: 1;
+        transform: translate3d(0, 0, 0);
+    }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+/* 标题容器样式 */
+.title-container {
+    background: linear-gradient(90deg, #0062be 0%, #00a4b4 50%, #0062be 100%); 
+    padding: 20px; 
+    border-radius: 15px; 
+    margin-bottom: 20px; 
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+}
+
+/* 标题文字样式 */
+.title-text {
+    font-size: 38px; 
+    text-align: center; 
+    margin: 0; 
+    padding: 0; 
+    color: #ffffff; 
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.5); 
+    font-family: 'Microsoft YaHei', '微软雅黑', sans-serif;
+}
+
+/* 标题字符动画样式 */
+.title-char {
+    display: inline-block; 
+    animation: fadeInUp 1.5s;
+}
+
+/* 标题字符延迟动画 */
+.title-char:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.title-char:nth-child(3) {
+    animation-delay: 0.4s;
+}
+
+.title-char:nth-child(4) {
+    animation-delay: 0.6s;
+}
+
+/* 副标题样式 */
+.subtitle {
+    text-align: center; 
+    color: #e0f0ff; 
+    margin-top: 10px; 
+    font-size: 16px; 
+    animation: fadeIn 2s;
+} 

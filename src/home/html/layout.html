@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>图片展示页面</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            line-height: 1.6;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .content-section {
+            display: flex;
+            align-items: stretch;
+            gap: 40px;
+            margin-bottom: 60px;
+        }
+
+        .content-section:last-child {
+            margin-bottom: 0;
+        }
+
+        .content-section.reverse {
+            flex-direction: row-reverse;
+        }
+
+        .image-container {
+            flex: 1;
+            width: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 300px;
+            cursor: pointer;
+            overflow: hidden;
+            border-radius: 8px;
+            position: relative;
+            background: #fff;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .image-container:hover {
+            transform: translateY(-5px) scale(1.02);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+        }
+
+        .image-container::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0);
+            transition: background 0.3s ease;
+            border-radius: 8px;
+        }
+
+        .image-container:hover::after {
+            background: rgba(0, 0, 0, 0.05);
+        }
+
+        .image-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .image-container:hover img {
+            transform: none;
+            box-shadow: none;
+        }
+
+        .text-button-container {
+            flex: 1;
+            width: 50%;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 20px 0;
+        }
+
+        .description {
+            margin-bottom: 20px;
+        }
+
+        .description h2 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 24px;
+        }
+
+        .description p {
+            color: #666;
+            font-size: 16px;
+            line-height: 1.8;
+        }
+
+        .button-container {
+            text-align: left;
+            margin-top: auto;
+        }
+
+        .cta-button {
+            display: inline-block;
+            padding: 12px 24px;
+            background-color: #4CAF50;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+
+        .cta-button:hover {
+            background-color: #45a049;
+        }
+
+        @media (max-width: 768px) {
+            .content-section,
+            .content-section.reverse {
+                flex-direction: column;
+                gap: 20px;
+            }
+
+            .image-container,
+            .text-button-container {
+                width: 100%;
+            }
+
+            .text-button-container {
+                padding: 0;
+            }
+
+            .image-container {
+                min-height: 200px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 第一个部分 -->
+        <div class="content-section">
+            <a href="#section1" class="image-container">
+                <img src="https://picsum.photos/600/400?random=1" alt="示例图片1">
+            </a>
+            <div class="text-button-container">
+                <div class="description">
+                    <h2>产品标题一</h2>
+                    <p>这是第一个产品的详细介绍。这里可以描述产品的特点、优势和其他重要信息。文字内容可以根据实际需求进行调整和修改。</p>
+                </div>
+                <div class="button-container">
+                    <a href="#section1" class="cta-button">了解更多</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- 第二个部分 -->
+        <div class="content-section reverse">
+            <a href="#section2" class="image-container">
+                <img src="https://picsum.photos/600/400?random=2" alt="示例图片2">
+            </a>
+            <div class="text-button-container">
+                <div class="description">
+                    <h2>产品标题二</h2>
+                    <p>这是第二个产品的详细介绍。每个产品都有其独特的特点和优势，您可以在这里突出展示这些特点。</p>
+                </div>
+                <div class="button-container">
+                    <a href="#section2" class="cta-button">了解更多</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- 第三个部分 -->
+        <div class="content-section">
+            <a href="#section3" class="image-container">
+                <img src="https://picsum.photos/600/400?random=3" alt="示例图片3">
+            </a>
+            <div class="text-button-container">
+                <div class="description">
+                    <h2>产品标题三</h2>
+                    <p>第三个产品的介绍文字。通过清晰的文字描述，让访问者能够快速了解产品的核心价值和主要功能。</p>
+                </div>
+                <div class="button-container">
+                    <a href="#section3" class="cta-button">了解更多</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- 第四个部分 -->
+        <div class="content-section reverse">
+            <a href="#section4" class="image-container">
+                <img src="https://picsum.photos/600/400?random=4" alt="示例图片4">
+            </a>
+            <div class="text-button-container">
+                <div class="description">
+                    <h2>产品标题四</h2>
+                    <p>第四个产品的详细说明。在这里可以介绍产品的使用场景、适用人群以及可能带来的收益。</p>
+                </div>
+                <div class="button-container">
+                    <a href="#section4" class="cta-button">了解更多</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- 第五个部分 -->
+        <div class="content-section">
+            <a href="#section5" class="image-container">
+                <img src="https://picsum.photos/600/400?random=5" alt="示例图片5">
+            </a>
+            <div class="text-button-container">
+                <div class="description">
+                    <h2>产品标题五</h2>
+                    <p>最后一个产品的介绍内容。您可以在这里总结产品系列的优势，或者突出这个特定产品的独特之处。</p>
+                </div>
+                <div class="button-container">
+                    <a href="#section5" class="cta-button">了解更多</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

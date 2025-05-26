@@ -3,3 +3,4 @@ mode_rules.md
 __pycache__/
 *.py[cod]
 *$py.class
+*.json

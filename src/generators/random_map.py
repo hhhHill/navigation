@@ -8,7 +8,7 @@ from ..models.vertex import Vertex
 from ..models.edge import Edge
 from .delaunay import create_delaunay_triangulation
 
-def generate_random_points(n=10000, x_min=0, y_min=0, x_max=1000, y_max=1000, min_distance=1.0):
+def generate_random_points(n=10000, x_min=0, y_min=0, x_max=10000, y_max=10000, min_distance=0):
     """
     生成随机分布的点集
     
@@ -23,57 +23,139 @@ def generate_random_points(n=10000, x_min=0, y_min=0, x_max=1000, y_max=1000, mi
     返回:
         生成的顶点列表
     """
+    
+    # 目标正方形数量（约100个）
+    target_grid_count = min(100, max(10, n // 100))
+    
+    # 计算每个维度的网格数量
+    width = x_max - x_min
+    height = y_max - y_min
+    grid_width = math.ceil(math.sqrt(target_grid_count * width / height))
+    grid_height = math.ceil(target_grid_count / grid_width)
+    
+    # 计算每个网格的尺寸
+    cell_width = width / grid_width
+    cell_height = height / grid_height
+    
+    # 初始化网格
+    grid = {}
+    for i in range(grid_width):
+        for j in range(grid_height):
+            grid[(i, j)] = []
+    
     vertices = []
-    attempts = 0
-    max_attempts = n * 10  # 最大尝试次数，避免无限循环
     
-    i = 0
-    while i < n and attempts < max_attempts:
-        # 生成随机坐标
-        x = random.uniform(x_min, x_max)
-        y = random.uniform(y_min, y_max)
+    # 生成n个点
+    for vertex_id in range(n):
+        # 计算每个网格的权重（反比于已有点的数量）
+        weights = []
+        cells = []
         
-        # 检查与已有点的最小距离
-        too_close = False
-        for v in vertices:
-            dist = ((v.x - x) ** 2 + (v.y - y) ** 2) ** 0.5
-            if dist < min_distance:
-                too_close = True
-                break
+        for cell, points in grid.items():
+            # 权重与网格中点的数量成反比
+            weight = 1.0 / (len(points) + 1)
+            weights.append(weight)
+            cells.append(cell)
         
-        attempts += 1
+        # 归一化权重作为概率
+        total_weight = sum(weights)
+        probabilities = [w / total_weight for w in weights]
         
-        # 如果该点与已有点太近，重新生成
-        if too_close:
-            continue
+        # 根据概率选择一个网格
+        selected_cell = random.choices(cells, probabilities)[0]
         
-        # 创建新顶点并添加到列表
-        vertex = Vertex(i, x, y)
+        # 在选定的网格内随机生成一个点
+        i, j = selected_cell
+        x = random.uniform(x_min + i * cell_width, x_min + (i + 1) * cell_width)
+        y = random.uniform(y_min + j * cell_height, y_min + (j + 1) * cell_height)
+        
+        # 如果指定了最小距离
+        if min_distance > 0:
+            # 检查与相邻网格中的点的距离
+            too_close = False
+            
+            # 获取需要检查的相邻网格
+            neighbors = [(i, j)]  # 包括当前网格
+            for di in [-1, 0, 1]:
+                for dj in [-1, 0, 1]:
+                    ni, nj = i + di, j + dj
+                    if (ni, nj) != (i, j) and 0 <= ni < grid_width and 0 <= nj < grid_height:
+                        neighbors.append((ni, nj))
+            
+            # 仅检查相邻网格中的点
+            for neighbor in neighbors:
+                for other_vertex in grid[neighbor]:
+                    dist = ((other_vertex.x - x) ** 2 + (other_vertex.y - y) ** 2) ** 0.5
+                    if dist < min_distance:
+                        too_close = True
+                        break
+                if too_close:
+                    break
+            
+            # 如果太近，跳过并在后面补充
+            if too_close:
+                continue
+        
+        # 创建新顶点
+        vertex = Vertex(vertex_id, x, y)
         vertices.append(vertex)
-        i += 1
+        
+        # 将点添加到对应的网格中
+        grid[selected_cell].append(vertex)
     
-    # 如果尝试次数过多仍未生成足够的点，减少最小距离要求
-    if len(vertices) < n:
+    # 如果由于最小距离约束没有生成足够的点，减小约束后补充
+    if len(vertices) < n and min_distance > 0:
         remaining = n - len(vertices)
         reduced_min_distance = min_distance * 0.5
         
-        i = len(vertices)
-        while i < n:
-            x = random.uniform(x_min, x_max)
-            y = random.uniform(y_min, y_max)
+        # 使用简单的随机生成方法补充其余的点
+        attempts = 0
+        max_attempts = remaining * 10
+        
+        while len(vertices) < n and attempts < max_attempts:
+            # 选择权重较小的网格
+            weights = []
+            cells = []
             
-            # 使用较小的最小距离检查
+            for cell, points in grid.items():
+                weight = 1.0 / (len(points) + 1)
+                weights.append(weight)
+                cells.append(cell)
+            
+            total_weight = sum(weights)
+            probabilities = [w / total_weight for w in weights]
+            
+            selected_cell = random.choices(cells, probabilities)[0]
+            
+            i, j = selected_cell
+            x = random.uniform(x_min + i * cell_width, x_min + (i + 1) * cell_width)
+            y = random.uniform(y_min + j * cell_height, y_min + (j + 1) * cell_height)
+            
+            # 使用较小的最小距离进行检查
             too_close = False
-            for v in vertices:
-                dist = ((v.x - x) ** 2 + (v.y - y) ** 2) ** 0.5
-                if dist < reduced_min_distance:
-                    too_close = True
+            
+            neighbors = [(i, j)]
+            for di in [-1, 0, 1]:
+                for dj in [-1, 0, 1]:
+                    ni, nj = i + di, j + dj
+                    if (ni, nj) != (i, j) and 0 <= ni < grid_width and 0 <= nj < grid_height:
+                        neighbors.append((ni, nj))
+            
+            for neighbor in neighbors:
+                for other_vertex in grid[neighbor]:
+                    dist = ((other_vertex.x - x) ** 2 + (other_vertex.y - y) ** 2) ** 0.5
+                    if dist < reduced_min_distance:
+                        too_close = True
+                        break
+                if too_close:
                     break
             
+            attempts += 1
+            
             if not too_close:
-                vertex = Vertex(i, x, y)
+                vertex = Vertex(len(vertices), x, y)
                 vertices.append(vertex)
-                i += 1
+                grid[selected_cell].append(vertex)
     
     return vertices
 
