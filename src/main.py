@@ -68,7 +68,7 @@ def test_traffic_simulation(graph: Graph, simulation_steps: int = 5):
         update_traffic_flow(graph)
         
         # 等待一段时间
-        time.sleep(2)
+        time.sleep(0.1)
 
 
 
@@ -287,10 +287,10 @@ def main():
     # 测试小规模地图生成（为了前端渲染效率，使用较小的规模）
     print("\n\n测试加载或生成地图")
     # 加载已存在的地图，如果加载失败则生成新地图
-    graph = test_random_map_generation(n=20000, load_existing=False)
+    graph = test_random_map_generation(n=10000, load_existing=False)
     
     # 检查实际生成的点数
-    print(f"实际生成的点数: {len(graph.vertices)}")
+    # print(f"实际生成的点数: {len(graph.vertices)}")
     
     # 测试四叉树性能
     # test_quadtree_performance(graph, num_queries=50)
@@ -303,13 +303,14 @@ def main():
         os.remove(data_path)
     
     # 测试交通流模拟
-    test_traffic_simulation(graph, simulation_steps=5)
+    # test_traffic_simulation(graph, simulation_steps=5)
     
     # 测试A*算法
-    test_a_star_algorithm(graph)
+    # test_a_star_algorithm(graph)
     # 导出数据并启动服务器
     print("\n准备导出地图数据并启动Web服务...")
     export_and_serve_map(graph, data_path=data_path)
+    # test_traffic_simulation(graph, simulation_steps=5)
 
 if __name__ == "__main__":
     main() 

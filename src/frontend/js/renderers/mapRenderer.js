@@ -329,9 +329,53 @@ async function switchToZoomLevel(zoomLevel, mapData) {
   }
 }
 
+/**
+ * 根据交通数据更新原始图层上边的颜色
+ * @param {Object} mapData - 包含 originalGraph 和 originalRenderer 的对象
+ * @param {Array} trafficEdgesData - 从服务器接收的边数据数组，每项包含 source, target, color
+ * @returns {number} 更新的边的数量
+ */
+function updateTrafficOnEdges(mapData, trafficEdgesData) {
+  const { originalGraph, originalRenderer } = mapData;
 
+  if (!originalGraph || !originalRenderer) {
+    console.error("原始图或渲染器不可用，无法更新交通数据。");
+    return 0;
+  }
+
+  let updatedCount = 0;
+  trafficEdgesData.forEach(trafficEdge => {
+    const sourceId = trafficEdge.source;
+    const targetId = trafficEdge.target;
+    const newColor = trafficEdge.color;
+
+    let edgeToUpdate;
+    // 检查边的两个方向，因为Graphology的edge()可能需要特定顺序或图可能是定向的
+    if (originalGraph.hasEdge(sourceId, targetId)) {
+        edgeToUpdate = originalGraph.edge(sourceId, targetId);
+    } else if (originalGraph.hasEdge(targetId, sourceId)) { // 也检查反向，以防万一
+        edgeToUpdate = originalGraph.edge(targetId, sourceId);
+    }
+
+    if (edgeToUpdate) {
+      originalGraph.setEdgeAttribute(edgeToUpdate, 'color', newColor);
+      // 如果需要，将来可以在这里更新其他属性，例如基于 trafficEdge.level 的大小
+      // originalGraph.setEdgeAttribute(edgeToUpdate, 'size', calculateDynamicSize(trafficEdge.level)); 
+      updatedCount++;
+    } else {
+      console.warn(`来自交通数据的边 (源: ${sourceId}, 目标: ${targetId}) 在原始图中未找到。`);
+    }
+  });
+
+  if (updatedCount > 0) {
+    originalRenderer.refresh();
+    console.log(`${updatedCount} 条边的交通颜色已更新，渲染器已刷新。`);
+  }
+  return updatedCount;
+}
 
 export { 
   initMapRender,
   switchToZoomLevel,
+  updateTrafficOnEdges
 }; 

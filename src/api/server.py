@@ -3,17 +3,20 @@ Flask服务器
 提供获取地图数据的API
 """
 from flask import Flask, jsonify, send_from_directory, request
+from flask_socketio import SocketIO, emit
 import json
 import os
 import time
 import sys
 import math
+import threading
 
 # 确保可以导入src模块
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 # 创建Flask应用
 app = Flask(__name__, static_folder='../frontend')
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 # 全局变量，在启动服务器时加载
 # 加载的Graph对象，用于空间查询
@@ -26,6 +29,12 @@ ZOOM_LEVEL_CLUSTERS = {}
 from src.algorithms.DBSCAN import DBSCAN, apply_dbscan
 # 导入KMeans和Mini-Batch KMeans
 from src.algorithms.KMeans import apply_kmeans, apply_mini_batch_kmeans
+# 导入交通模拟模块
+from src.algorithms.traffic_simulate import update_traffic_flow, get_traffic_color, get_traffic_level
+
+# 交通模拟全局变量
+traffic_simulation_running = False
+traffic_simulation_thread = None
 
 @app.route('/api/map-data')
 def get_map_data():
@@ -705,6 +714,80 @@ def precompute_zoom_level_clusters_KMeans(graph):
         print(f"缩放等级 {zoom_level} KMeans聚类完成，耗时 {process_time:.2f} 秒，生成了 {len(result_nodes)} 个节点和 {len(result_edges)} 条边")
     print("所有缩放等级的KMeans聚类预计算完成")
 
+@socketio.on('connect')
+def handle_connect():
+    """处理客户端连接"""
+    print('客户端已连接')
+    emit('connection_response', {'data': '已成功连接到服务器'})
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    """处理客户端断开连接"""
+    print('客户端已断开连接')
+
+@socketio.on('start_traffic_simulation')
+def handle_start_simulation():
+    """开始交通模拟"""
+    global traffic_simulation_running
+    global traffic_simulation_thread
+    
+    if traffic_simulation_running:
+        emit('simulation_status', {'status': 'already_running'})
+        return
+    
+    if GRAPH is None:
+        emit('simulation_status', {'status': 'error', 'message': '图数据尚未加载完成'})
+        return
+    
+    traffic_simulation_running = True
+    traffic_simulation_thread = threading.Thread(target=traffic_simulation_loop)
+    traffic_simulation_thread.daemon = True
+    traffic_simulation_thread.start()
+    
+    emit('simulation_status', {'status': 'started'})
+    print('交通模拟已启动')
+
+@socketio.on('stop_traffic_simulation')
+def handle_stop_simulation():
+    """停止交通模拟"""
+    global traffic_simulation_running
+    
+    traffic_simulation_running = False
+    emit('simulation_status', {'status': 'stopped'})
+    print('交通模拟已停止')
+
+def traffic_simulation_loop():
+    """交通模拟循环"""
+    global traffic_simulation_running
+    
+    while traffic_simulation_running:
+        if GRAPH is not None:
+            # 更新交通流
+            update_traffic_flow(GRAPH)
+            
+            # 获取交通颜色和等级
+            traffic_colors = get_traffic_color(GRAPH)
+            traffic_levels = get_traffic_level(GRAPH)
+            
+            # 构建边数据
+            edges_data = []
+            for edge_id, edge in GRAPH.edges.items():
+                edges_data.append({
+                    "id": edge_id,
+                    "source": edge.vertex1.id,
+                    "target": edge.vertex2.id,
+                    "color": traffic_colors.get(edge_id, "#808080"),
+                    "level": traffic_levels.get(edge_id, 0),
+                    "current_vehicles": edge.current_vehicles,
+                    "capacity": edge.capacity
+                })
+            
+            # 发送数据到客户端
+            socketio.emit('traffic_update', {'edges': edges_data})
+        
+        # 休眠一段时间
+        time.sleep(0.1)  # 500毫秒更新一次
+
 def run_server(host='127.0.0.1', port=5000, debug=True):
     """
     运行Flask服务器
@@ -738,13 +821,44 @@ def run_server(host='127.0.0.1', port=5000, debug=True):
         for node in map_data.get('nodes', []):
             vertex = GRAPH.create_vertex(float(node['x']), float(node['y']))
             vertex_map[node['id']] = vertex
+            
+            # 设置顶点属性（如果有）
+            if 'is_gas_station' in node:
+                vertex.is_gas_station = node['is_gas_station']
+            if 'is_shopping_mall' in node:
+                vertex.is_shopping_mall = node['is_shopping_mall']
+            if 'is_parking_lot' in node:
+                vertex.is_parking_lot = node['is_parking_lot']
         
         # 添加边
-        for edge in map_data.get('edges', []):
-            source_id = edge.get('source')
-            target_id = edge.get('target')
+        for edge_data in map_data.get('edges', []):
+            source_id = edge_data.get('source')
+            target_id = edge_data.get('target')
             if source_id in vertex_map and target_id in vertex_map:
-                GRAPH.create_edge(vertex_map[source_id], vertex_map[target_id])
+                new_edge = GRAPH.create_edge(vertex_map[source_id], vertex_map[target_id])
+                
+                # 设置边的属性（如果有）
+                if 'length' in edge_data:
+                    new_edge.length = edge_data['length']
+                else:
+                    # 计算边长度
+                    new_edge.length = math.sqrt((new_edge.vertex1.x - new_edge.vertex2.x)**2 + 
+                                              (new_edge.vertex1.y - new_edge.vertex2.y)**2)
+                
+                if 'capacity' in edge_data:
+                    new_edge.capacity = edge_data['capacity']
+                else:
+                    new_edge.capacity = max(10, int(new_edge.length * 0.5))
+                    
+                if 'current_vehicles' in edge_data:
+                    new_edge.current_vehicles = edge_data['current_vehicles']
+                else:
+                    new_edge.current_vehicles = int(new_edge.capacity * 0.3)
+                    
+                if 'is_mall_connection' in edge_data:
+                    new_edge.is_mall_connection = edge_data['is_mall_connection']
+                else:
+                    new_edge.is_mall_connection = False
         
         # 构建空间索引
         GRAPH.build_spatial_index()
@@ -763,4 +877,4 @@ def run_server(host='127.0.0.1', port=5000, debug=True):
     
     # 启动服务器
     print(f"启动Flask服务器: http://{host}:{port}")
-    app.run(host=host, port=port, debug=debug) 
+    socketio.run(app, host=host, port=port, debug=debug) 

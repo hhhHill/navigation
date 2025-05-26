@@ -1,3 +1,5 @@
+import { io } from 'https://cdn.socket.io/4.7.2/socket.io.esm.min.js';
+
 /**
  * API服务模块 - 负责处理与后端API的通信
  */
@@ -96,4 +98,34 @@ async function fetchQuadtreeData() {
     }
 }
 
-export { fetchMapData, fetchNearbyNodesData, fetchQuadtreeData, fetchZoomClusterData }; 
+/**
+ * 监听WebSocket服务器发送的消息
+ * @param {string} eventName - 要监听的事件名称
+ * @param {Function} callback - 收到消息时调用的回调函数
+ */
+function listenToSocket(eventName, callback) {
+  const socket = io('ws://127.0.0.1:5000'); // 或者您的服务器地址
+
+  socket.on('connect', () => {
+    console.log('已连接到 WebSocket 服务器');
+  });
+
+  socket.on(eventName, (data) => {
+    if (callback && typeof callback === 'function') {
+      callback(data);
+    }
+  });
+
+  socket.on('disconnect', () => {
+    console.log('已从 WebSocket 服务器断开');
+  });
+
+  socket.on('connect_error', (error) => {
+    console.error('WebSocket 连接错误:', error);
+  });
+
+  // 返回socket实例，以便调用者可以执行其他操作，例如关闭连接
+  return socket;
+}
+
+export { fetchMapData, fetchNearbyNodesData, fetchQuadtreeData, fetchZoomClusterData, listenToSocket }; 
