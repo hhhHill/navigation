@@ -2,6 +2,9 @@
 边类，表示地图中的一条道路
 """
 import math
+import random
+from .vertex import Vertex
+from ..algorithms.traffic_simulate import *
 
 class Edge:
     """
@@ -14,9 +17,10 @@ class Edge:
         length: 边的长度（两顶点间的欧几里得距离）
         capacity: 道路容量（饱和状态下可容纳的车辆数量）
         current_vehicles: 当前道路上的车辆数
+        is_mall_connection: 是否连接商场
     """
     
-    def __init__(self, id, vertex1, vertex2, capacity=100):
+    def __init__(self, id, vertex1, vertex2, capacity=100, is_mall_connection=False):
         """
         初始化边
         
@@ -24,18 +28,21 @@ class Edge:
             id: 边的唯一标识符
             vertex1: 第一个顶点
             vertex2: 第二个顶点
-            capacity: 道路容量
+            capacity: 道路容量，理想化为边长度的100倍
+            is_mall_connection: 是否连接商场
         """
         self.id = id
         self.vertex1 = vertex1
         self.vertex2 = vertex2
         self.length = self._calculate_length()
-        self.capacity = capacity
-        self.current_vehicles = 0
+        self.capacity : int = int(self.length *100)
+        self.current_vehicles : int = random.randint(min(100,int(self.capacity)), int(self.capacity))
+        self.is_mall_connection = is_mall_connection
         
         # 将边添加到两个顶点
         vertex1.add_edge(self)
         vertex2.add_edge(self)
+    
     
     def _calculate_length(self):
         """
@@ -62,67 +69,6 @@ class Edge:
         elif vertex == self.vertex2:
             return self.vertex1
         return None
-    
-    def travel_time(self, c=1.0):
-        """
-        计算通过该边的时间
-        
-        参数:
-            c: 时间系数
-            
-        返回:
-            通行时间
-        """
-        if self.capacity == 0:
-            return float('inf')
-        
-        # 计算拥堵系数
-        x = self.current_vehicles / self.capacity
-        
-        # 分段函数 f(x)
-        if x <= 1.0:
-            f = 1.0
-        else:
-            f = 1.0 + math.exp(x - 1.0)
-        
-        return c * self.length * f
-    
-    def update_vehicles(self, count):
-        """
-        更新道路上的车辆数量
-        
-        参数:
-            count: 要添加的车辆数量（可为负数）
-        """
-        self.current_vehicles = max(0, self.current_vehicles + count)
-    
-    def get_congestion_level(self):
-        """
-        获取道路拥堵等级
-        
-        返回:
-            拥堵等级（0-4）
-            0: 畅通
-            1: 轻微拥堵
-            2: 中度拥堵
-            3: 严重拥堵
-            4: 极度拥堵
-        """
-        if self.capacity == 0:
-            return 4
-        
-        ratio = self.current_vehicles / self.capacity
-        
-        if ratio < 0.5:
-            return 0  # 畅通
-        elif ratio < 0.8:
-            return 1  # 轻微拥堵
-        elif ratio < 1.0:
-            return 2  # 中度拥堵
-        elif ratio < 1.5:
-            return 3  # 严重拥堵
-        else:
-            return 4  # 极度拥堵
     
     def __str__(self):
         """返回边的字符串表示"""

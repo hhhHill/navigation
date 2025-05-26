@@ -195,9 +195,7 @@ def generate_connected_map(vertices, edge_factor=2.5, capacity_range=(50, 200)):
     for v1_id, v2_id in edges:
         v1 = graph.get_vertex(v1_id)
         v2 = graph.get_vertex(v2_id)
-        # 随机生成道路容量
-        capacity = random.randint(capacity_range[0], capacity_range[1])
-        graph.create_edge(v1, v2, capacity)
+        graph.create_edge(v1, v2)
     
     print(f"DEBUG: 三角剖分结束")
     # 确保图连通
@@ -206,9 +204,6 @@ def generate_connected_map(vertices, edge_factor=2.5, capacity_range=(50, 200)):
     # 随机添加额外的边以增加道路网络密度
     add_additional_edges(graph, edge_factor)
     print(f"DEBUG: 随机添加额外的边结束")
-    # 设置道路容量
-    set_road_capacities(graph, capacity_range)
-    print(f"DEBUG: 设置道路容量结束")
     print(f"DEBUG: 连通图执行完毕")
     return graph
 
@@ -417,21 +412,5 @@ def on_segment(p1, p2, p3):
     """
     return (min(p1[0], p2[0]) <= p3[0] <= max(p1[0], p2[0]) and
             min(p1[1], p2[1]) <= p3[1] <= max(p1[1], p2[1]))
-
-def set_road_capacities(graph, capacity_range=(50, 200)):
-    """
-    设置道路容量
-    
-    参数:
-        graph: 要设置容量的图
-        capacity_range: 道路容量范围(min, max)
-    """
-    min_cap, max_cap = capacity_range
-    
-    for edge in graph.edges.values():
-        # 根据边的长度设置容量（较长的道路有较大容量）
-        normalized_length = min(1.0, edge.length / 100)  # 归一化长度
-        capacity = int(min_cap + normalized_length * (max_cap - min_cap))
-        edge.capacity = capacity 
 
     

@@ -1,6 +1,7 @@
 """
 顶点类，表示地图中的一个地点
 """
+import random
 
 class Vertex:
     """
@@ -11,6 +12,9 @@ class Vertex:
         x: x坐标
         y: y坐标
         edges: 与该顶点相连的边列表
+        is_gas_station: 是否是加油站
+        is_restaurant: 是否是餐厅
+        is_parking_lot: 是否是停车场
     """
     
     def __init__(self, id, x, y):
@@ -26,6 +30,42 @@ class Vertex:
         self.x = x
         self.y = y
         self.edges = []
+        self.is_gas_station = False
+        self.is_shopping_mall = False
+        self.is_parking_lot = False
+        
+        # 随机分配属性（1%的概率）
+        self._assign_random_attribute()
+    
+    def _assign_random_attribute(self):
+        """
+        随机分配顶点属性（加油站、商场、停车场）
+        每个顶点有1%的概率被分配为其中一种属性
+        """
+        if random.random() < 0.01:  # 1%的概率
+            # 随机选择一种属性
+            attribute = random.choice(['gas_station', 'shopping_mall', 'parking_lot'])
+            if attribute == 'gas_station':
+                self.is_gas_station = True
+            elif attribute == 'shopping_mall':
+                self.is_shopping_mall = True
+            else:  # parking_lot
+                self.is_parking_lot = True
+    
+    def get_attribute_type(self) -> str:
+        """
+        获取顶点的属性类型
+        
+        返回:
+            属性类型字符串：'gas_station', 'shopping_mall', 'parking_lot' 或 'normal'
+        """
+        if self.is_gas_station:
+            return 'gas_station'
+        elif self.is_shopping_mall:
+            return 'shopping_mall'
+        elif self.is_parking_lot:
+            return 'parking_lot'
+        return 'normal'
     
     def add_edge(self, edge):
         """
