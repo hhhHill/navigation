@@ -169,3 +169,9 @@ def init_traffic_simulation(graph: Graph, congestion_threshold: float = 0.5, int
     global threshold, update_interval
     threshold = congestion_threshold
     update_interval = interval
+    
+    for edge_id, edge in graph.edges.items():
+        # 检查边的顶点是否为商场
+        if edge.vertex1.is_mall or edge.vertex2.is_mall:
+            # 如果是商场连接的边，设置初始车流量为普通边的1.5倍
+            edge.current_vehicles = min(edge.current_vehicles * 1.5, edge.capacity)
