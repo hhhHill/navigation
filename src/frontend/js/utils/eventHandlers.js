@@ -348,10 +348,6 @@ function initEventListeners(mapData) {
 
   console.log("相机状态监听已设置为 afterRender 事件机制"+"当前模式为"+state.currentLayer);
 
-  // 根据用户需求，初始化后立即切换到 'original' 图层模式
-  const closestZoomLevel = findClosestZoomLevel(0.1, state.zoomThresholds);
-  switchToZoomLevel(closestZoomLevel, mapData);
-  switchLayer('original', mapData);
 }
 
 /**
@@ -642,6 +638,7 @@ function switchLayer(layerType, mapData) {
       root.style.setProperty('--current-console-bg', getComputedStyle(root).getPropertyValue('--original-console-bg').trim());
       root.style.setProperty('--current-console-header-bg', getComputedStyle(root).getPropertyValue('--original-console-header-bg').trim());
       
+
       // 设置原始图层文本颜色
       root.style.setProperty('--current-sidebar-text', getComputedStyle(root).getPropertyValue('--original-sidebar-text').trim());
       root.style.setProperty('--current-panel-text', getComputedStyle(root).getPropertyValue('--original-panel-text').trim());
@@ -655,6 +652,7 @@ function switchLayer(layerType, mapData) {
       clusterLayer.style.display = "block";
       clusterLayer.style.zIndex = "10";
       state.lastClusterCameraState = clusterRenderer.getCamera().getState();
+      switchToZoomLevel(findClosestZoomLevel(clusterRenderer.getCamera().getState().ratio, state.zoomThresholds), mapData);
       clusterRenderer.refresh();
       
       // 设置集群图层主题色和背景色
