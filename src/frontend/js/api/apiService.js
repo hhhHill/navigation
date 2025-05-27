@@ -128,4 +128,40 @@ function listenToSocket(eventName, callback) {
   return socket;
 }
 
-export { fetchMapData, fetchNearbyNodesData, fetchQuadtreeData, fetchZoomClusterData, listenToSocket }; 
+/**
+ * 获取最短路径数据
+ * @param {string} start_id - 起始节点ID
+ * @param {string} end_id - 终止节点ID
+ * @returns {Promise<Object>} 包含路径数据的对象
+ */
+async function fetchShortestPath(start_id, end_id) {
+  try {
+    const requestData = {
+      start_id: start_id,
+      end_id: end_id,
+      path_types: ["fastest", "shortest_by_length"]
+    };
+
+    const response = await fetch('/api/paths', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestData),
+    });
+
+    const responseData = await response.json(); // 尝试解析JSON，无论响应是否OK
+
+    if (!response.ok) {
+      // 即使不是2xx响应，也返回responseData，以便调用者可以处理错误信息
+      return responseData;
+    }
+
+    return responseData;
+  } catch (error) {
+    console.error("请求路径数据时发生错误:", error);
+    throw error; // 重新抛出错误以便调用者处理
+  }
+}
+
+export { fetchMapData, fetchNearbyNodesData, fetchQuadtreeData, fetchZoomClusterData, listenToSocket, fetchShortestPath }; 

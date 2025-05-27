@@ -1,9 +1,8 @@
 /**
  * 地图渲染模块 - 负责处理地图渲染和视图切换
  */
-import { COLORS } from '../utils/nodeHandler.js';
+import { COLORS } from '../utils/rengerHelper.js';
 import { fetchZoomClusterData } from '../api/apiService.js';
-
 /**
  * 初始化地图渲染
  * @param {Object} data - 包含detailData的对象
@@ -64,7 +63,7 @@ function initMapRender(data) {
   const clusterRenderer = new Sigma(clusterGraph, clusterContainer, {
     // 渲染设置
     renderEdgeLabels: false,
-    minCameraRatio: 0.1,
+    minCameraRatio: 0.05,
     maxCameraRatio: 2,
     defaultNodeColor: COLORS.ORIGINAL_NODE,
     defaultEdgeColor: COLORS.ORIGINAL_EDGE,
@@ -77,7 +76,7 @@ function initMapRender(data) {
   const originalRenderer = new Sigma(originalGraph, originalContainer, {
     // 渲染设置
     renderEdgeLabels: true,
-    minCameraRatio: 0.1,
+    minCameraRatio: 0.05,
     maxCameraRatio: 2,
     defaultNodeColor: COLORS.ORIGINAL_NODE,
     defaultEdgeColor: COLORS.ORIGINAL_EDGE,
@@ -122,8 +121,11 @@ function initMapRender(data) {
       }
       
       originalGraph.addEdge(source, target, {
-        size:  3,
-        color: edge.color || COLORS.ORIGINAL_EDGE
+        size:  3, // 使用较小的节点大小
+        color: edge.color || COLORS.ORIGINAL_EDGE,
+        level: edge.level,
+        current_vehicles: edge.current_vehicles,
+        capacity: edge.capacity
       });
     } catch (e) {
       console.error("添加边时出错:", e, edge);
@@ -336,7 +338,7 @@ async function switchToZoomLevel(zoomLevel, mapData) {
  * @returns {number} 更新的边的数量
  */
 function updateTrafficOnEdges(mapData, trafficEdgesData) {
-  const { originalGraph, originalRenderer } = mapData;
+  const { originalGraph, originalRenderer, state } = mapData;
 
   if (!originalGraph || !originalRenderer) {
     console.error("原始图或渲染器不可用，无法更新交通数据。");
@@ -344,32 +346,84 @@ function updateTrafficOnEdges(mapData, trafficEdgesData) {
   }
 
   let updatedCount = 0;
+  let protectedEdgesCount = 0;
+  
   trafficEdgesData.forEach(trafficEdge => {
     const sourceId = trafficEdge.source;
     const targetId = trafficEdge.target;
     const newColor = trafficEdge.color;
 
     let edgeToUpdate;
+    let edgeKeyGraphology = null; // 用于在 activeNearbySearch 中检查的边ID
+
     // 检查边的两个方向，因为Graphology的edge()可能需要特定顺序或图可能是定向的
     if (originalGraph.hasEdge(sourceId, targetId)) {
         edgeToUpdate = originalGraph.edge(sourceId, targetId);
+        edgeKeyGraphology = edgeToUpdate; // Graphology 返回的边ID
     } else if (originalGraph.hasEdge(targetId, sourceId)) { // 也检查反向，以防万一
         edgeToUpdate = originalGraph.edge(targetId, sourceId);
+        edgeKeyGraphology = edgeToUpdate;
     }
 
     if (edgeToUpdate) {
-      originalGraph.setEdgeAttribute(edgeToUpdate, 'color', newColor);
-      // 如果需要，将来可以在这里更新其他属性，例如基于 trafficEdge.level 的大小
-      // originalGraph.setEdgeAttribute(edgeToUpdate, 'size', calculateDynamicSize(trafficEdge.level)); 
-      updatedCount++;
+      let isHighlighted = false; // 标记边是否被高亮（需要保护颜色）
+      
+      // 检查是否在邻近搜索高亮的边中
+      if (state && state.activeNearbySearch && state.activeNearbySearch.relatedEdgeIds && 
+          state.activeNearbySearch.relatedEdgeIds.includes(edgeKeyGraphology)) {
+        isHighlighted = true;
+      }
+      
+      // 检查是否在高亮路径上的边（最短路径或最快路径）
+      if (!isHighlighted && state && state.highlightedPaths) {
+        // 检查最短路径
+        if (state.highlightedPaths.shortestPath && 
+            state.highlightedPaths.shortestPath.edgeIds && 
+            state.highlightedPaths.shortestPath.edgeIds.has(edgeKeyGraphology)) {
+          isHighlighted = true;
+        }
+        
+        // 检查最快路径
+        if (!isHighlighted && state.highlightedPaths.fastestPath && 
+            state.highlightedPaths.fastestPath.edgeIds && 
+            state.highlightedPaths.fastestPath.edgeIds.has(edgeKeyGraphology)) {
+          isHighlighted = true;
+        }
+        
+        // 检查其他高亮路径
+        if (!isHighlighted && state.highlightedPaths.otherPaths && 
+            state.highlightedPaths.otherPaths.edgeIds && 
+            state.highlightedPaths.otherPaths.edgeIds.has(edgeKeyGraphology)) {
+          isHighlighted = true;
+        }
+      }
+
+      if (!isHighlighted) {
+        // 如果边没有被高亮，正常更新颜色
+        originalGraph.setEdgeAttribute(edgeToUpdate, 'color', newColor);
+        updatedCount++;
+      } else {
+        // 边被高亮，保护其颜色
+        protectedEdgesCount++;
+      }
+      
+      // 始终更新交通相关的属性（无论边是否被高亮）
+      if (trafficEdge.current_vehicles !== undefined) {
+          originalGraph.setEdgeAttribute(edgeToUpdate, 'current_vehicles', trafficEdge.current_vehicles);
+      }
+      if (trafficEdge.capacity !== undefined) {
+          originalGraph.setEdgeAttribute(edgeToUpdate, 'capacity', trafficEdge.capacity);
+      }
     } else {
       console.warn(`来自交通数据的边 (源: ${sourceId}, 目标: ${targetId}) 在原始图中未找到。`);
     }
   });
 
-  if (updatedCount > 0) {
+  if (updatedCount > 0 || protectedEdgesCount > 0) {
     originalRenderer.refresh();
-    console.log(`${updatedCount} 条边的交通颜色已更新，渲染器已刷新。`);
+    if (protectedEdgesCount > 0) {
+      console.log(`交通更新: ${updatedCount} 条边颜色已更新，${protectedEdgesCount} 条高亮边颜色已保护。`);
+    }
   }
   return updatedCount;
 }

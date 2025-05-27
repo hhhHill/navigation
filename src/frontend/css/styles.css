@@ -782,3 +782,266 @@ html .console-header {
 .console-header {
     border-bottom: 1px solid var(--theme-color);
 } 
+/* 适用于信息框容器的基本样式 - 修改为标签样式 */
+.info-box-container {
+    position: fixed; /* 仍然 fixed 以便在 body 上定位 */
+    top: 0;
+    left: 0;
+    width: 0; /* 容器本身不占据空间 */
+    height: 0; /* 容器本身不占据空间 */
+    /* background-color: rgba(0, 0, 0, 0.2); Removed background */
+    z-index: 10000; 
+    pointer-events: none; /* 允许穿透点击 */
+}
+
+/* 信息框本身的样式 - 修改为标签样式 */
+.info-box {
+    position: fixed; 
+    background-color: rgba(250, 250, 250, 0.95); /*略微透明的浅色背景*/
+    color: #333;
+    padding: 10px 15px;
+    border-radius: 5px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15); /*更柔和的阴影*/
+    min-width: auto; /* 自动宽度 */
+    max-width: 350px; /* 限制最大宽度 */
+    font-size: 13px; /* 统一字体大小 */
+    pointer-events: auto; /* 信息框本身可交互 */
+    transition: opacity 0.3s ease, transform 0.3s ease; /* 添加过渡效果 */
+}
+
+.info-box h3 {
+    margin-top: 0;
+    margin-bottom: 8px;
+    font-size: 14px; /* 减小标题字号 */
+    border-bottom: 1px solid #e0e0e0;
+    padding-bottom: 5px;
+    color: var(--theme-color, #007bff);
+}
+
+.info-box ul {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+}
+
+.info-box ul li {
+    padding: 4px 0; /* 减小列表项间距 */
+    font-size: 13px;
+    border-bottom: 1px dotted #f0f0f0; /*虚线分隔*/
+}
+.info-box ul li:last-child {
+    border-bottom: none;
+}
+.info-box ul li strong {
+    color: var(--theme-color-dark-700, #444);
+    margin-right: 6px;
+}
+
+/* 关闭按钮的样式 - 修改为更小巧 */
+.info-box-close {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    background: transparent;
+    border: none;
+    font-size: 16px;
+    font-weight: normal;
+    color: #888;
+    cursor: pointer;
+    padding: 3px;
+    line-height: 1;
+    transition: color 0.2s ease;
+}
+
+.info-box-close:hover {
+    color: #000;
+}
+
+/* 模态框样式 */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.3s ease;
+}
+
+.modal-content {
+    background-color: #fff;
+    margin: auto;
+    width: 90%;
+    max-width: 500px;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    padding: 20px;
+    position: relative;
+    animation: slideIn 0.3s ease;
+}
+
+.close-modal {
+    position: absolute;
+    right: 15px;
+    top: 10px;
+    color: #888;
+    font-size: 24px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.close-modal:hover {
+    color: var(--theme-color);
+}
+
+.modal h3 {
+    margin-top: 0;
+    color: var(--theme-color);
+    border-bottom: 2px solid var(--theme-color-light-200);
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+    font-weight: 500;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 500;
+    color: #555;
+}
+
+.form-control {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    transition: border-color 0.2s;
+    box-sizing: border-box;
+}
+
+.form-control:focus {
+    border-color: var(--theme-color);
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(79, 172, 254, 0.2);
+}
+
+.button-container {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.primary-btn {
+    background-color: var(--theme-color);
+    color: white;
+}
+
+.primary-btn:hover {
+    background-color: var(--theme-color-dark-700);
+}
+
+.secondary-btn {
+    background-color: #f1f1f1;
+    color: #555;
+}
+
+.secondary-btn:hover {
+    background-color: #e0e0e0;
+}
+
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.result-container {
+    margin-top: 20px;
+    padding: 15px;
+    border-radius: 4px;
+    background-color: #f9f9f9;
+    border-left: 4px solid var(--theme-color);
+}
+
+.result-container h4 {
+    margin-top: 0;
+    color: #333;
+    margin-bottom: 10px;
+}
+
+.result-container p {
+    margin: 5px 0;
+    line-height: 1.5;
+}
+
+.result-container .error {
+    color: #d32f2f;
+}
+
+.result-container .warning {
+    color: #f57c00;
+}
+
+.result-container .success {
+    color: #388e3c;
+}
+
+.result-container .info {
+    color: #1976d2;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateY(-20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.path-legend {
+    margin-top: 15px;
+    padding: 10px;
+    background-color: #f5f5f5;
+    border-radius: 4px;
+    border-left: 4px solid var(--theme-color);
+}
+
+.path-legend p {
+    margin: 5px 0;
+    font-size: 13px;
+}
+
+.path-legend p strong {
+    font-weight: 600;
+}

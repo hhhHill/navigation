@@ -132,6 +132,112 @@ function showMessage(container, message, type = '') {
 }
 
 /**
+ * 创建并显示一个信息框
+ * @param {Object} data - 要在信息框中显示的数据对象
+ * @param {string} title - 信息框的标题 (可选)
+ * @param {number} x - 信息框的 x 坐标 (可选, 仅当需要动态定位时)
+ * @param {number} y - 信息框的 y 坐标 (可选, 仅当需要动态定位时)
+ * @returns {HTMLElement} 创建的信息框元素
+ */
+function showInfoBox(data, title = '详细信息', x = null, y = null) {
+  // 移除已存在的信息框
+  removeElement('info-box-container');
+
+  const infoBoxContainer = document.createElement('div');
+  infoBoxContainer.id = 'info-box-container';
+  infoBoxContainer.className = 'info-box-container';
+
+  const infoBox = document.createElement('div');
+  infoBox.className = 'info-box';
+
+  const INFO_BOX_TIMEOUT = 5000; // 信息框自动消失时间 (毫秒)
+  let autoCloseTimer = null;
+
+  function closeInfoBox() {
+    if (autoCloseTimer) {
+      clearTimeout(autoCloseTimer);
+    }
+    if (infoBoxContainer.parentNode) {
+      infoBoxContainer.style.opacity = '0';
+      // infoBox.style.transform = 'translateY(-10px)'; // 可选: 向上移出动画
+      setTimeout(() => {
+        if (infoBoxContainer.parentNode) {
+          infoBoxContainer.parentNode.removeChild(infoBoxContainer);
+        }
+      }, 300); // 等待动画完成
+    }
+  }
+
+  // 如果提供了 x 和 y 坐标，则进行定位
+  if (typeof x === 'number' && typeof y === 'number' && !isNaN(x) && !isNaN(y)) {
+    // 简单的偏移，避免直接在鼠标指针下生成，可以根据需要调整
+    const offsetX = 0;
+    const offsetY = 0;
+    infoBox.style.left = `${x + offsetX}px`;
+    infoBox.style.top = `${y + offsetY}px`;
+
+    // 确保信息框不会超出屏幕边界
+    // 延迟获取尺寸，确保元素已渲染
+    setTimeout(() => {
+        const boxRect = infoBox.getBoundingClientRect();
+        const bodyRect = document.body.getBoundingClientRect();
+
+        if (boxRect.right > bodyRect.right - 10) { // 10px buffer
+            infoBox.style.left = `${document.body.clientWidth - boxRect.width - 10}px`;
+        }
+        if (boxRect.left < 10) {
+             infoBox.style.left = `10px`;
+        }
+        if (boxRect.bottom > bodyRect.bottom - 10) {
+            infoBox.style.top = `${document.body.clientHeight - boxRect.height - 10}px`;
+        }
+        if (boxRect.top < 10) {
+            infoBox.style.top = `10px`;
+        }
+    }, 0);
+
+  } else {
+    // 如果没有提供坐标或坐标无效，则居中显示
+    console.warn('InfoBox: 无效或缺失坐标，信息框将居中显示。', `X: ${x}, Y: ${y}`);
+    infoBox.style.left = '50%';
+    infoBox.style.top = '50%';
+    infoBox.style.transform = 'translate(-50%, -50%)';
+  }
+
+  // 添加标题
+  const titleElement = document.createElement('h3');
+  titleElement.textContent = title;
+  infoBox.appendChild(titleElement);
+
+  // 添加关闭按钮
+  const closeButton = document.createElement('button');
+  closeButton.className = 'info-box-close';
+  closeButton.innerHTML = '&times;'; 
+  closeButton.onclick = closeInfoBox; // 点击关闭按钮时关闭
+  infoBox.appendChild(closeButton);
+
+  // 添加数据内容
+  const contentElement = document.createElement('ul');
+  for (const key in data) {
+    if (Object.prototype.hasOwnProperty.call(data, key)) {
+      const listItem = document.createElement('li');
+      listItem.innerHTML = `<strong>${key}:</strong> ${data[key]}`;
+      contentElement.appendChild(listItem);
+    }
+  }
+  infoBox.appendChild(contentElement);
+
+  infoBoxContainer.appendChild(infoBox);
+  // 将信息框附加到 document.body 以确保 z-index 和 fixed positioning 生效
+  document.body.appendChild(infoBoxContainer);
+
+  // 设置自动消失
+  autoCloseTimer = setTimeout(closeInfoBox, INFO_BOX_TIMEOUT);
+
+  return infoBoxContainer;
+}
+
+/**
  * 移除元素
  * @param {string} elementId - 要移除元素的ID
  */
@@ -209,6 +315,7 @@ export {
   showResultMessage,
   showErrorMessage,
   showMessage,
+  showInfoBox,
   removeElement,
   createControlButton,
   addConsoleMessage

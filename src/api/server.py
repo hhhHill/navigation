@@ -31,6 +31,8 @@ from src.algorithms.DBSCAN import DBSCAN, apply_dbscan
 from src.algorithms.KMeans import apply_kmeans, apply_mini_batch_kmeans
 # 导入交通模拟模块
 from src.algorithms.traffic_simulate import update_traffic_flow, get_traffic_color, get_traffic_level
+# 导入A*寻路算法
+from src.algorithms.a_star import find_shortest_path, find_fastest_path
 
 # 交通模拟全局变量
 traffic_simulation_running = False
@@ -627,92 +629,149 @@ def get_kmeans_clusters():
         print(error_traceback)
         return jsonify({"error": str(e), "traceback": error_traceback}), 500
 
-# 预计算所有缩放等级的KMeans聚类结果
+@app.route('/api/paths', methods=['POST'])
+def get_paths():
+    """
+    提供路径计算的API端点
+    接收起点和终点ID以及路径类型参数，计算并返回指定类型的路径（最快或最短）
+    """
+    try:
+        data = request.get_json()
+        # 接收起点和终点的顶点ID
+        start_id = data.get('start_id')
+        end_id = data.get('end_id')
+        # 接收需要计算的路径类型列表，例如 ["fastest", "shortest_by_length"]
+        path_types = data.get('path_types', ["fastest"])
 
-def precompute_zoom_level_clusters_KMeans(graph):
-    """
-    为所有预定义的缩放等级预计算Mini-Batch KMeans聚类结果
-    参数:
-        graph: 图对象
-    """
-    global ZOOM_LEVEL_CLUSTERS
-    ZOOM_LEVEL_CLUSTERS = {}
-    
-    node_count = len(graph.vertices)
-    print(f"开始为 {node_count} 个节点预计算不同缩放等级的KMeans聚类...")
-    
-    # 定义要处理的缩放等级
-    zoom_levels = [0.3, 0.5, 1.0]
-    for zoom_level in zoom_levels:
-        print(f"预计算缩放等级 {zoom_level} 的KMeans聚类...")
-        start_time = time.time()
-        # 根据缩放等级设置K值
-        if zoom_level <= 0.3:
-            n_clusters = 1200
-        elif zoom_level <= 0.5:
-            n_clusters = 600
-        else:
-            n_clusters = 300
-        batch_size = 256
-        print(f"Mini-Batch KMeans参数: n_clusters={n_clusters}, batch_size={batch_size}")
-        # 聚类
-        cluster_labels, centroids = apply_mini_batch_kmeans(
-            graph,
-            n_clusters=n_clusters,
-            batch_size=batch_size,
-            max_iter=100,
-            tol=1e-3,
-            max_no_improvement=10
-        )
-        # 构建聚类代表点（质心）节点
+        if start_id is None or end_id is None:
+            return jsonify({"error": "请求中必须包含起点ID (start_id) 和终点ID (end_id)"}), 400
+        
+        if not isinstance(path_types, list) or not path_types:
+             return jsonify({"error": "请求中必须包含有效的路径类型列表 (path_types)"}), 400
+
+        global GRAPH
+        if GRAPH is None:
+            return jsonify({"error": "图数据尚未加载完成，请稍后再试"}), 500
+
+        # 添加逻辑：解析前端发送的ID，处理 "node" + ID 格式或直接的数字ID
+        actual_start_id = None
+        if isinstance(start_id, str) and start_id.startswith('node'):
+            try:
+                # 尝试提取数字部分并转换为整数 (与图中的整数ID类型匹配)
+                actual_start_id = int(start_id[4:])
+            except ValueError:
+                 return jsonify({"error": f"无效的起点ID格式: {start_id}"}), 400
+        elif isinstance(start_id, (int, str)):
+             # 如果前端直接发送了数字ID (整数或字符串形式的数字)
+            try:
+                actual_start_id = int(str(start_id)) # 确保转换为整数以匹配图中的ID类型
+            except ValueError:
+                return jsonify({"error": f"无效的起点ID格式: {start_id}"}), 400
+
+        actual_end_id = None
+        if isinstance(end_id, str) and end_id.startswith('node'):
+            try:
+                # 尝试提取数字部分并转换为整数 (与图中的整数ID类型匹配)
+                actual_end_id = int(end_id[4:])
+            except ValueError:
+                 return jsonify({"error": f"无效的终点ID格式: {end_id}"}), 400
+        elif isinstance(end_id, (int, str)):
+             # 如果前端直接发送了数字ID (整数或字符串形式的数字)
+            try:
+                actual_end_id = int(str(end_id)) # 确保转换为整数以匹配图中的ID类型
+            except ValueError:
+                return jsonify({"error": f"无效的终点ID格式: {end_id}"}), 400
+
+        # 查找顶点
+        start_vertex = GRAPH.get_vertex(actual_start_id)
+        end_vertex = GRAPH.get_vertex(actual_end_id)
+
+
+        if start_vertex is None:
+            return jsonify({"error": f"未找到ID为 {start_id} 的起点 (实际查找ID: {actual_start_id})"}), 404
+        if end_vertex is None:
+            return jsonify({"error": f"未找到ID为 {end_id} 的终点 (实际查找ID: {actual_end_id})"}), 404
+        
+        if start_vertex == end_vertex:
+             return jsonify({"message": "起点和终点是同一个节点。", "nodes": [{"id": start_vertex.id, "x": start_vertex.x, "y": start_vertex.y}], "paths": {}}), 200
+
+        print(f"收到路径请求: 从顶点ID {start_id} 到顶点ID {end_id}")
+        print(f"实际查找ID: 起点 {actual_start_id}, 终点 {actual_end_id}")
+
+        response_paths = {}
+        all_path_vertices = set()
+
+        if "fastest" in path_types:
+            # 使用A*算法查找最快路径 (考虑交通)
+            path_vertices, path_edges, total_cost = find_fastest_path(GRAPH, start_vertex, end_vertex, use_traffic=True)
+            if path_vertices:
+                 result_edges = []
+                 for edge in path_edges:
+                     result_edges.append({
+                         "id": edge.id,
+                         "source": edge.vertex1.id,
+                         "target": edge.vertex2.id,
+                         "length": edge.length,
+                         "current_vehicles": edge.current_vehicles, # 添加交通信息
+                         "capacity": edge.capacity # 添加交通信息
+                     })
+                 response_paths["fastest_path"] = {
+                     "edges": result_edges,
+                     "total_cost": total_cost # 此时total_cost是时间
+                 }
+                 for v in path_vertices: all_path_vertices.add(v)
+                 print(f"找到最快路径，包含 {len(result_edges)} 条边，总时间: {total_cost:.2f}")
+            else:
+                 response_paths["fastest_path"] = {"error": "未能找到最快路径"}
+
+        if "shortest_by_length" in path_types:
+             # 使用A*算法查找最短路径 (不考虑交通，基于长度)
+            path_vertices_len, path_edges_len, total_distance = find_fastest_path(GRAPH, start_vertex, end_vertex, use_traffic=False)
+            if path_vertices_len:
+                 result_edges_len = []
+                 for edge in path_edges_len:
+                     result_edges_len.append({
+                         "id": edge.id,
+                         "source": edge.vertex1.id,
+                         "target": edge.vertex2.id,
+                         "length": edge.length
+                     })
+                 response_paths["shortest_path_by_length"] = {
+                     "edges": result_edges_len,
+                     "total_cost": total_distance # 此时total_cost是距离
+                 }
+                 for v in path_vertices_len: all_path_vertices.add(v)
+                 print(f"找到最短路径 (按长度)，包含 {len(result_edges_len)} 条边，总距离: {total_distance:.2f}")
+            else:
+                response_paths["shortest_path_by_length"] = {"error": "未能找到最短路径 (按长度)"}
+
+        if not response_paths:
+             return jsonify({"error": "未找到指定类型的路径"}), 404
+
+        # 构建返回的所有相关节点数据
         result_nodes = []
-        for i, centroid in enumerate(centroids):
-            if centroid is not None and not (isinstance(centroid, float) and math.isnan(centroid)):
-                result_nodes.append({
-                    "id": f"centroid_{i}",
-                    "label": f"Cluster {i} (z{zoom_level})",
-                    "x": float(centroid[0]),
-                    "y": float(centroid[1]),
-                    "size": 3,
-                    "cluster_id": i,
-                    "zoom_level": zoom_level
-                })
-        # 构建质心之间的边（如果原图中有边连接两个不同簇的点，则在对应质心之间连边，去重）
-        result_edges = []
-        edge_set = set()
-        vertex_to_cluster = cluster_labels
-        for edge_id, edge in graph.edges.items():
-            v1_id = edge.vertex1.id
-            v2_id = edge.vertex2.id
-            c1 = vertex_to_cluster.get(v1_id)
-            c2 = vertex_to_cluster.get(v2_id)
-            if c1 is None or c2 is None or c1 == c2:
-                continue
-            source_id = f"centroid_{min(c1, c2)}"
-            target_id = f"centroid_{max(c1, c2)}"
-            edge_key = f"{source_id}_{target_id}"
-            if edge_key not in edge_set:
-                edge_set.add(edge_key)
-                result_edges.append({
-                    "id": f"{edge_key}_z{zoom_level}",
-                    "source": source_id,
-                    "target": target_id,
-                    "zoom_level": zoom_level
-                })
-        # 存储结果
-        ZOOM_LEVEL_CLUSTERS[zoom_level] = {
+        # 将集合转换为列表并排序，确保顺序一致性 (可选)
+        sorted_vertices = sorted(list(all_path_vertices), key=lambda v: v.id)
+        for vertex in sorted_vertices:
+            result_nodes.append({
+                "id": vertex.id,
+                "x": vertex.x,
+                "y": vertex.y
+            })
+
+        response_data = {
             "nodes": result_nodes,
-            "edges": result_edges,
-            "params": {
-                "n_clusters": n_clusters,
-                "zoom_level": zoom_level,
-                "node_count": len(result_nodes),
-                "edge_count": len(result_edges)
-            }
+            "paths": response_paths # 包含不同类型的路径结果
         }
-        process_time = time.time() - start_time
-        print(f"缩放等级 {zoom_level} KMeans聚类完成，耗时 {process_time:.2f} 秒，生成了 {len(result_nodes)} 个节点和 {len(result_edges)} 条边")
-    print("所有缩放等级的KMeans聚类预计算完成")
+        
+        return jsonify(response_data)
+
+    except Exception as e:
+        import traceback
+        error_traceback = traceback.format_exc()
+        print(f"处理路径请求时出错: {str(e)}")
+        print(error_traceback)
+        return jsonify({"error": str(e), "traceback": error_traceback}), 500
 
 @socketio.on('connect')
 def handle_connect():
@@ -786,7 +845,7 @@ def traffic_simulation_loop():
             socketio.emit('traffic_update', {'edges': edges_data})
         
         # 休眠一段时间
-        time.sleep(0.1)  # 500毫秒更新一次
+        time.sleep(2)  # 500毫秒更新一次
 
 def run_server(host='127.0.0.1', port=5000, debug=True):
     """
@@ -867,7 +926,7 @@ def run_server(host='127.0.0.1', port=5000, debug=True):
         
         # 预计算不同缩放等级的聚类结果
         # 如需切换为DBSCAN预计算，请改为 precompute_zoom_level_clusters_DBSCAN(GRAPH)
-        precompute_zoom_level_clusters_KMeans(GRAPH)
+        precompute_zoom_level_clusters_DBSCAN(GRAPH)
         
     except Exception as e:
         import traceback
