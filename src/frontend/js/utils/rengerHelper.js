@@ -118,11 +118,10 @@ function highlightNearbyNodes(graph, nodes, edges) {
 }
 
 /**
- * 重置节点和边的颜色
+ * 清除附近点和边的高亮
  * @param {Object} graph - graphology图实例
- * @param {Object} renderer - sigma渲染器实例
  */
-function resetNodeAndEdgeColors(graph, renderer) {
+function clearNearbyHighlights(graph) {
   // 重置节点颜色
   graph.forEachNode((nodeId, attributes) => {
     if (nodeState[nodeId]) {
@@ -130,7 +129,7 @@ function resetNodeAndEdgeColors(graph, renderer) {
       graph.setNodeAttribute(nodeId, "size", nodeState[nodeId].originalSize || 5);
     }
   });
-  
+
   // 重置边颜色
   graph.forEachEdge((edgeId, attributes) => {
     if (edgeState[edgeId]) {
@@ -138,13 +137,63 @@ function resetNodeAndEdgeColors(graph, renderer) {
       graph.setEdgeAttribute(edgeId, "size", edgeState[edgeId].originalSize || 1);
     }
   });
-  
+
   // 清空状态记录
   nodeState = {};
   edgeState = {};
-  
-  // 清空高亮路径数据
+}
+
+/**
+ * 清除路径高亮
+ * @param {Object} graph - graphology图实例
+ */
+function clearPathHighlights(graph) {
   if (window.mapData && window.mapData.state && window.mapData.state.highlightedPaths) {
+    const paths = window.mapData.state.highlightedPaths;
+
+    // 重置最短路径
+    paths.shortestPath.edgeIds.forEach(edgeId => {
+      if (graph.hasEdge(edgeId)) {
+        graph.setEdgeAttribute(edgeId, "color", edgeState[edgeId]?.originalColor || COLORS.ORIGINAL_EDGE);
+        graph.setEdgeAttribute(edgeId, "size", edgeState[edgeId]?.originalSize || 3);
+      }
+    });
+    paths.shortestPath.nodeIds.forEach(nodeId => {
+      if (graph.hasNode(nodeId)) {
+        graph.setNodeAttribute(nodeId, "color", nodeState[nodeId]?.originalColor || COLORS.ORIGINAL_NODE);
+        graph.setNodeAttribute(nodeId, "size", nodeState[nodeId]?.originalSize || 3);
+      }
+    });
+
+    // 重置最快路径
+    paths.fastestPath.edgeIds.forEach(edgeId => {
+      if (graph.hasEdge(edgeId)) {
+        graph.setEdgeAttribute(edgeId, "color", edgeState[edgeId]?.originalColor || COLORS.ORIGINAL_EDGE);
+        graph.setEdgeAttribute(edgeId, "size", edgeState[edgeId]?.originalSize || 3);
+      }
+    });
+    paths.fastestPath.nodeIds.forEach(nodeId => {
+      if (graph.hasNode(nodeId)) {
+        graph.setNodeAttribute(nodeId, "color", nodeState[nodeId]?.originalColor || COLORS.ORIGINAL_NODE);
+        graph.setNodeAttribute(nodeId, "size", nodeState[nodeId]?.originalSize || 3);
+      }
+    });
+
+    // 重置其他路径
+    paths.otherPaths.edgeIds.forEach(edgeId => {
+      if (graph.hasEdge(edgeId)) {
+        graph.setEdgeAttribute(edgeId, "color", edgeState[edgeId]?.originalColor || COLORS.ORIGINAL_EDGE);
+        graph.setEdgeAttribute(edgeId, "size", edgeState[edgeId]?.originalSize || 3);
+      }
+    });
+    paths.otherPaths.nodeIds.forEach(nodeId => {
+      if (graph.hasNode(nodeId)) {
+        graph.setNodeAttribute(nodeId, "color", nodeState[nodeId]?.originalColor || COLORS.ORIGINAL_NODE);
+        graph.setNodeAttribute(nodeId, "size", nodeState[nodeId]?.originalSize || 3);
+      }
+    });
+
+    // 清空高亮路径数据
     window.mapData.state.highlightedPaths = {
       shortestPath: { edgeIds: new Set(), nodeIds: new Set() },
       fastestPath: { edgeIds: new Set(), nodeIds: new Set() },
@@ -152,7 +201,20 @@ function resetNodeAndEdgeColors(graph, renderer) {
     };
     console.log('已清除高亮路径数据');
   }
-  
+}
+
+/**
+ * 重置节点和边的颜色
+ * @param {Object} graph - graphology图实例
+ * @param {Object} renderer - sigma渲染器实例
+ */
+function resetNodeAndEdgeColors(graph, renderer) {
+  // 清除附近点和边的高亮
+  clearNearbyHighlights(graph);
+
+  // 清除路径高亮
+  clearPathHighlights(graph);
+
   // 刷新渲染
   renderer.refresh();
 }
@@ -171,6 +233,8 @@ function highlightEdges(graph, edges, color, highlightNodes = true, nodeColor = 
     console.warn("无效的参数传递给highlightEdges");
     return;
   }
+
+
 
   // 存储沿途的节点ID和边ID（用于高亮和防止交通更新覆盖）
   const pathNodeIds = new Set();
@@ -217,7 +281,7 @@ function highlightEdges(graph, edges, color, highlightNodes = true, nodeColor = 
     if (edgeId) {
       // 如果边已存在，修改颜色和大小
       graph.setEdgeAttribute(edgeId, "color", color);
-      graph.setEdgeAttribute(edgeId, "size", 2); // 加粗显示
+      graph.setEdgeAttribute(edgeId, "size", 6); // 加粗显示
     } else {
       // 如果边不存在，添加到图中
       try {
@@ -278,4 +342,4 @@ function highlightEdges(graph, edges, color, highlightNodes = true, nodeColor = 
   return { edgeIds: pathEdgeIds, nodeIds: pathNodeIds };
 }
 
-export { COLORS, highlightNearbyNodes, resetNodeAndEdgeColors, highlightEdges }; 
+export { COLORS, highlightNearbyNodes, resetNodeAndEdgeColors, highlightEdges, clearNearbyHighlights, clearPathHighlights };

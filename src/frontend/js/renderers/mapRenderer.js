@@ -340,6 +340,7 @@ async function switchToZoomLevel(zoomLevel, mapData) {
 function updateTrafficOnEdges(mapData, trafficEdgesData) {
   const { originalGraph, originalRenderer, state } = mapData;
 
+  console.log("开始执行交通模拟！")
   if (!originalGraph || !originalRenderer) {
     console.error("原始图或渲染器不可用，无法更新交通数据。");
     return 0;

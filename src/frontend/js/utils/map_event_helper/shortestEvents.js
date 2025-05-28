@@ -27,6 +27,7 @@ function initShortestPathEvents(mapData) {
             </div>
             <div class="button-container">
               <button id="calculate-path-btn" class="btn primary-btn">计算路径</button>
+              <button id="reset-highlight-btn" class="btn secondary-btn">清除高亮</button>
               <button id="cancel-path-btn" class="btn secondary-btn">取消</button>
             </div>
             <div id="path-result-container" class="result-container" style="display: none;"></div>
@@ -45,6 +46,7 @@ function initShortestPathEvents(mapData) {
       const calculateBtn = document.getElementById('calculate-path-btn');
       const cancelBtn = document.getElementById('cancel-path-btn');
       const resultContainer = document.getElementById('path-result-container');
+      const resetHighlightBtn = document.getElementById('reset-highlight-btn');
 
       // 显示模态框
       modal.style.display = 'block';
@@ -58,6 +60,15 @@ function initShortestPathEvents(mapData) {
       // 绑定关闭按钮事件
       closeBtn.addEventListener('click', closeModal);
       cancelBtn.addEventListener('click', closeModal);
+
+      // 绑定重置高亮按钮事件
+      resetHighlightBtn.addEventListener('click', function() {
+        if (window.mapData && window.mapData.originalGraph && window.mapData.originalRenderer) {
+          resetNodeAndEdgeColors(window.mapData.originalGraph, window.mapData.originalRenderer);
+          window.mapData.originalRenderer.refresh();
+          addConsoleMessage("已清除路径高亮", "info");
+        }
+      });
 
       // 点击模态框外部关闭
       window.addEventListener('click', (event) => {
@@ -190,23 +201,6 @@ function initShortestPathEvents(mapData) {
           resultContainer.innerHTML = resultHtml;
           console.log("路径数据:", responseData);
           addConsoleMessage(`成功计算从 ${startId} 到 ${endId} 的路径`);
-
-          // 添加重置高亮的按钮
-          if (fastestPathEdges || shortestPathEdges) {
-            const resetButton = document.createElement('button');
-            resetButton.innerHTML = '清除高亮';
-            resetButton.className = 'secondary-btn';
-            resetButton.style.marginTop = '10px';
-            resetButton.onclick = function() {
-              if (window.mapData && window.mapData.originalGraph && window.mapData.originalRenderer) {
-                resetNodeAndEdgeColors(window.mapData.originalGraph, window.mapData.originalRenderer);
-                window.mapData.originalRenderer.refresh();
-                addConsoleMessage("已清除路径高亮", "info");
-                this.disabled = true;
-              }
-            };
-            resultContainer.appendChild(resetButton);
-          }
 
         } catch (error) {
           console.error("请求路径数据时发生错误:", error);
