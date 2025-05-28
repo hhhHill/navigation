@@ -53,13 +53,6 @@ function initSigmaEventHandlers(mapData) {
     const { originalGraph, originalRenderer, state } = mapData;
     if (state.activeNearbySearch) {
       const { targetNodeId, relatedEdgeIds } = state.activeNearbySearch;
-
-      // 恢复目标节点原始样式
-      // 注意：这里假设我们保存了原始样式，或者 resetNodeAndEdgeColors 能正确处理
-      // 为了简化，我们先调用 resetNodeAndEdgeColors，它会恢复所有节点和边
-      // 后续可以优化为只恢复特定的节点和边
-
-      // 调用 resetNodeAndEdgeColors 来恢复所有节点和边的默认样式
       resetNodeAndEdgeColors(originalGraph, originalRenderer);
 
 
@@ -227,8 +220,8 @@ function initSigmaEventHandlers(mapData) {
   
   // 当鼠标进入边时触发
   originalRenderer.on("enterEdge", function(event) {
-    console.log("鼠标进入边，改变鼠标样式");
     // 获取 Sigma 容器元素
+
     const container = originalRenderer.getContainer();
     if (container) {
       container.style.cursor = 'pointer'; // 改变鼠标样式为手型
@@ -237,7 +230,6 @@ function initSigmaEventHandlers(mapData) {
 
   // 当鼠标离开边时触发
   originalRenderer.on("leaveEdge", function(event) {
-    console.log("鼠标离开边，恢复鼠标样式");
     // 获取 Sigma 容器元素
     const container = originalRenderer.getContainer();
     if (container) {
