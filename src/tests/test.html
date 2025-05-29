@@ -3,35 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>鼠标滚轮测试</title>
+    <title>Sigma.js CDN Example</title>
     <style>
-        body {
-            height: 2000px;
-            margin: 0;
-            padding: 20px;
-            font-family: Arial, sans-serif;
-        }
-        #output {
-            position: fixed;
-            top: 20px;
-            left: 20px;
-            background: #f0f0f0;
-            padding: 10px;
+        #sigma-container {
+            width: 600px;
+            height: 400px;
+            margin: 50px auto;
             border: 1px solid #ccc;
-            max-height: 300px;
-            overflow-y: auto;
-            width: 300px;
         }
     </style>
+    <!-- Graphology CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/graphology@0.25.4/graphology.umd.min.js"></script>
 </head>
 <body>
-    <div id="output">滚动页面来测试...<br></div>
+    <div id="sigma-container"></div>
 
-    <script>
-        const output = document.getElementById('output');
-        let timer = null;
-        
-
+    <!-- Sigma.js CDN -->
+    <script type="module" src="https://cdn.jsdelivr.net/npm/sigma@3.0.2/+esm"></script>
+    <!-- Node Image Plugin CDN (optional, if needed) -->
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@sigma/node-image@3.0.0/+esm"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/graphology/0.25.4/graphology.umd.min.js"></script>
+    <script type="module" src="test.js"></script>
     </script>
 </body>
 </html>

@@ -51,8 +51,17 @@ function switchLayer(layerType, mapData) {
       originalLayer.style.zIndex = "5";
       clusterLayer.style.display = "block";
       clusterLayer.style.zIndex = "10";
-      state.lastClusterCameraState = clusterRenderer.getCamera().getState();
-      switchToZoomLevel(findClosestZoomLevel(clusterRenderer.getCamera().getState().ratio, state.zoomThresholds), mapData);
+
+      // 从 originalRenderer 同步镜头状态到 clusterRenderer
+      const currentOriginalCameraState = originalRenderer.getCamera().getState();
+      const clusterCamera = clusterRenderer.getCamera();
+
+      clusterCamera.x = currentOriginalCameraState.x;
+      clusterCamera.y = currentOriginalCameraState.y;
+      clusterCamera.ratio = currentOriginalCameraState.ratio;
+
+      state.lastClusterCameraState = clusterCamera.getState(); // 更新存储的集群图层最后镜头状态
+      switchToZoomLevel(findClosestZoomLevel(clusterCamera.ratio, state.zoomThresholds), mapData);
       clusterRenderer.refresh();
 
       // 设置集群图层主题色和背景色
@@ -76,16 +85,19 @@ function switchLayer(layerType, mapData) {
       originalLayer.style.zIndex = "10";
       clusterLayer.style.display = "block";
       clusterLayer.style.zIndex = "5";
+
+      // 从 clusterRenderer 同步镜头状态到 originalRenderer
+      const currentClusterCameraState = clusterRenderer.getCamera().getState();
+      const originalCamera = originalRenderer.getCamera();
+
+      originalCamera.x = currentClusterCameraState.x;
+      originalCamera.y = currentClusterCameraState.y;
+      originalCamera.ratio = currentClusterCameraState.ratio;
+
+      state.lastOriginalCameraState = originalCamera.getState();
       const activeMaskStyle = `radial-gradient(circle at 50% 50%, rgba(0,0,0,0.2) 0px, rgba(0,0,0,0.2) 100%)`;
       originalLayer.style.webkitMask = activeMaskStyle;
       originalLayer.style.mask = activeMaskStyle;
-      state.lastOriginalCameraState = originalRenderer.getCamera().getState();
-      // Ensure cluster camera is initially synced in mixed mode if just switched to it
-      const currentOriginalCam = originalRenderer.getCamera().getState();
-      const cCam = clusterRenderer.getCamera();
-      cCam.x = currentOriginalCam.x;
-      cCam.y = currentOriginalCam.y;
-      cCam.ratio = currentOriginalCam.ratio;
       originalRenderer.refresh();
       clusterRenderer.refresh();
 

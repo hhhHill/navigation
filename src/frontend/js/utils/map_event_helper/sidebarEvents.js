@@ -1,4 +1,4 @@
-
+import { resizeSigmaRenderers } from './resizerEvents.js';
 import { addConsoleMessage } from '../uiUtils.js';
 /**
  * 初始化侧边栏切换功能

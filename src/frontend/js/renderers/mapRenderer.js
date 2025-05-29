@@ -3,6 +3,9 @@
  */
 import { COLORS } from '../utils/rengerHelper.js';
 import { fetchZoomClusterData } from '../api/apiService.js';
+import Sigma from 'https://cdn.jsdelivr.net/npm/sigma@3.0.2/+esm';
+import { createNodeImageProgram,NodeImageProgram } from "https://cdn.jsdelivr.net/npm/@sigma/node-image@3.0.0/+esm";
+
 /**
  * 初始化地图渲染
  * @param {Object} data - 包含detailData的对象
@@ -68,7 +71,7 @@ function initMapRender(data) {
     defaultNodeColor: COLORS.ORIGINAL_NODE,
     defaultEdgeColor: COLORS.ORIGINAL_EDGE,
     // 减小滚轮缩放幅度
-    zoomingRatio: 1,
+    zoomingRatio: 1.7,
     autoRescale: false, // 默认开启自动调整
   });
   
@@ -80,7 +83,7 @@ function initMapRender(data) {
     maxCameraRatio: 2,
     defaultNodeColor: COLORS.ORIGINAL_NODE,
     defaultEdgeColor: COLORS.ORIGINAL_EDGE,
-    zoomingRatio: 1,
+    zoomingRatio: 1.7,
     autoRescale: false,
     // 边交互设置
     enableEdgeEvents: true,
@@ -90,22 +93,44 @@ function initMapRender(data) {
     // 增加边的尺寸，使其更容易被鼠标选中
     edgeMinSize: 5,
     edgeMaxSize: 8,
-
+    // **注册自定义节点程序**
+    nodeProgramClasses: {
+      image: createNodeImageProgram(), // 这里注册了图片节点程序
+         },
   });
   
   // 加载原始数据到originalGraph
   console.log("加载原始数据到图层...");
   // 添加节点
   state.detailNodes.forEach(node => {
-    originalGraph.addNode(node.id, {
+    const nodeAttributes = {
       label: node.label || `Node ${node.id}`,
       x: node.x,
       y: node.y,
       size: 3, // 使用较小的节点大小
       color: node.color || COLORS.ORIGINAL_NODE,
       cluster_id: node.cluster_id,
-      original: true
-    });
+      original: true, 
+      // 添加 type 和 image 属性用于图片节点渲染
+    };
+    
+    // // 检查是否为特殊地点，添加对应图像并设置 type 为 'image'
+    if (node.is_gas_station) {
+      nodeAttributes.type = 'image';
+      nodeAttributes.image = "/icons/gas_station.png";
+      nodeAttributes.size = 8; // 增加带图像节点的大小以便更好地显示
+    } else if (node.is_shopping_mall) {
+      nodeAttributes.type = 'image';
+      nodeAttributes.image = "/icons/shopping_mall.png";
+      nodeAttributes.size = 8;
+    } else if (node.is_parking_lot) {
+      nodeAttributes.type = 'image';
+      nodeAttributes.image = "/icons/parking_lot.png";
+      nodeAttributes.size = 8;
+    }
+    
+    
+    originalGraph.addNode(node.id, nodeAttributes);
   });
   
   // 添加边
@@ -340,7 +365,6 @@ async function switchToZoomLevel(zoomLevel, mapData) {
 function updateTrafficOnEdges(mapData, trafficEdgesData) {
   const { originalGraph, originalRenderer, state } = mapData;
 
-  console.log("开始执行交通模拟！")
   if (!originalGraph || !originalRenderer) {
     console.error("原始图或渲染器不可用，无法更新交通数据。");
     return 0;
@@ -433,4 +457,4 @@ export {
   initMapRender,
   switchToZoomLevel,
   updateTrafficOnEdges
-}; 
+};
