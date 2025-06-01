@@ -4,7 +4,8 @@
 import { handleNearbyNodesRequest } from '../eventHandlers.js';
 import { updateScaleInfo, addConsoleMessage, showInfoBox } from '../uiUtils.js';
 import { switchToZoomLevel } from '../../renderers/mapRenderer.js';
-import { COLORS, resetNodeAndEdgeColors } from '../rengerHelper.js';
+import { COLORS, resetNodeAndEdgeColors } from '../renderHelper.js';
+import { fetchNearbySpecialPoints } from '../../api/apiService.js';
 
 /**
  * 找到最接近的预定义缩放等级
@@ -149,6 +150,79 @@ function initSigmaEventHandlers(mapData) {
 
     lastClickTime = currentTime;
   });
+  originalRenderer.on("rightClickNode", function(event) { 
+    const nodeId = event.node;
+    console.log("节点被右键点击:", nodeId);
+    addConsoleMessage(`节点 ${nodeId} 被右键点击`);
+    // 调用API获取附近特殊点信息（加油站、购物中心、停车场等）
+    fetchNearbySpecialPoints(nodeId, 100)
+      .then(data => {
+        console.log("获取到节点附近的特殊点:", data);
+        // 这里可以添加处理特殊点数据的逻辑
+        // 例如: 高亮显示特殊点，显示信息框等
+        
+        if (data && data.special_points_in_radius) {
+          // 计算特殊点总数
+          const totalSpecialPoints = 
+            (data.special_points_in_radius.gas_stations?.count || 0) +
+            (data.special_points_in_radius.shopping_malls?.count || 0) +
+            (data.special_points_in_radius.parking_lots?.count || 0);
+            
+          addConsoleMessage(`获取到节点附近的特殊点总数: ${totalSpecialPoints}`);
+
+          if (totalSpecialPoints > 0) {
+            // 显示信息框，列出找到的特殊点
+            let infoContent = {
+              '节点ID': nodeId,
+              '半径': '5000米', // 注意这里半径应与请求一致
+              '特殊点总数': totalSpecialPoints
+            };
+            
+            // 详细列出每种特殊点
+            if (data.special_points_in_radius.gas_stations?.ids.length > 0) {
+                infoContent['加油站'] = data.special_points_in_radius.gas_stations.ids.map(id => `ID: ${id}`).join(', ');
+            }
+             if (data.special_points_in_radius.shopping_malls?.ids.length > 0) {
+                infoContent['购物中心'] = data.special_points_in_radius.shopping_malls.ids.map(id => `ID: ${id}`).join(', ');
+            }
+             if (data.special_points_in_radius.parking_lots?.ids.length > 0) {
+                infoContent['停车场'] = data.special_points_in_radius.parking_lots.ids.map(id => `ID: ${id}`).join(', ');
+            }
+
+            // // 也可以添加到最近特殊点的路径信息
+            // if (data.paths_to_nearest_special_points) {
+            //     let pathsInfo = [];
+            //     for (const type in data.paths_to_nearest_special_points) {
+            //         const pathInfo = data.paths_to_nearest_special_points[type];
+            //         if (pathInfo && pathInfo.target_id !== undefined) { // 检查路径信息是否存在且有效
+            //              pathsInfo.push(`${type} (最近点ID: ${pathInfo.target_id}, 距离: ${pathInfo.distance.toFixed(2)}米)`);
+            //         }
+            //     }
+            //      if (pathsInfo.length > 0) {
+            //         infoContent['到最近特殊点路径'] = pathsInfo.join('\n');
+            //     }
+            // }
+            
+            // 使用鼠标事件坐标显示信息框
+            const clickX = event.original?.clientX || 0;
+            const clickY = event.original?.clientY || 0;
+            showInfoBox(infoContent, `节点 ${nodeId} 附近的特殊点信息`, clickX, clickY);
+          } else {
+            console.log("在指定半径内未找到特殊点");
+            addConsoleMessage("在指定半径内未找到特殊点");
+          }
+        } else {
+           console.log("获取到的数据格式不正确或没有特殊点信息");
+           addConsoleMessage("获取特殊点信息失败或数据为空");
+        }
+      })
+      .catch(error => {
+        console.error("获取附近特殊点时出错:", error);
+        addConsoleMessage("获取附近特殊点时出错: " + error.message);
+      });
+  });
+
+  
   //单击边显示边的信息
   originalRenderer.on("clickEdge", function(event) {
     console.log("边被点击:", event.edge, "原始事件:", event.original);
@@ -236,7 +310,7 @@ function initSigmaEventHandlers(mapData) {
       container.style.cursor = 'default'; // 恢复默认鼠标样式
     }
   });
-
+  
   // 初始化相机状态，保存引用
   // state.lastCameraState = originalRenderer.getCamera().getState(); // This was in initEventListeners, but seems more relevant if used by sigma handlers
 
@@ -280,26 +354,26 @@ function initSigmaEventHandlers(mapData) {
     const currentOriginalCamera = originalRenderer.getCamera().getState();
 
     // --- 平移/缩放限制逻辑 (始终基于originalRenderer) ---
-    if (currentOriginalCamera.ratio < 1) {
-      if (state.hasPanLimitation) {
-        console.log("重新启用平移功能");
-        const originalDomElement = originalRenderer.getContainer();
-        originalDomElement.removeEventListener('mousedown', state.panLimitHandlers.mousedownHandler, false);
-        originalDomElement.removeEventListener('touchstart', state.panLimitHandlers.touchstartHandler, false);
-        originalDomElement.removeEventListener('mousemove', state.panLimitHandlers.mousemoveHandler, false);
-        originalDomElement.removeEventListener('touchmove', state.panLimitHandlers.touchmoveHandler, false);
-        state.hasPanLimitation = false;
-      }
-    }
-    if (currentOriginalCamera.ratio >= 1 && !state.hasPanLimitation) {
-      console.log("阻止鼠标和触摸事件导致的平移");
-      const originalDomElement = originalRenderer.getContainer();
-      originalDomElement.addEventListener('mousedown', state.panLimitHandlers.mousedownHandler, false);
-      originalDomElement.addEventListener('touchstart', state.panLimitHandlers.touchstartHandler, false);
-      originalDomElement.addEventListener('mousemove', state.panLimitHandlers.mousemoveHandler, false);
-      originalDomElement.addEventListener('touchmove', state.panLimitHandlers.touchmoveHandler, false);
-      state.hasPanLimitation = true;
-    }
+    // if (currentOriginalCamera.ratio < 1) {
+    //   if (state.hasPanLimitation) {
+    //     console.log("重新启用平移功能");
+    //     const originalDomElement = originalRenderer.getContainer();
+    //     originalDomElement.removeEventListener('mousedown', state.panLimitHandlers.mousedownHandler, false);
+    //     originalDomElement.removeEventListener('touchstart', state.panLimitHandlers.touchstartHandler, false);
+    //     originalDomElement.removeEventListener('mousemove', state.panLimitHandlers.mousemoveHandler, false);
+    //     originalDomElement.removeEventListener('touchmove', state.panLimitHandlers.touchmoveHandler, false);
+    //     state.hasPanLimitation = false;
+    //   }
+    // }
+    // if (currentOriginalCamera.ratio >= 1 && !state.hasPanLimitation) {
+    //   console.log("阻止鼠标和触摸事件导致的平移");
+    //   const originalDomElement = originalRenderer.getContainer();
+    //   originalDomElement.addEventListener('mousedown', state.panLimitHandlers.mousedownHandler, false);
+    //   originalDomElement.addEventListener('touchstart', state.panLimitHandlers.touchstartHandler, false);
+    //   originalDomElement.addEventListener('mousemove', state.panLimitHandlers.mousemoveHandler, false);
+    //   originalDomElement.addEventListener('touchmove', state.panLimitHandlers.touchmoveHandler, false);
+    //   state.hasPanLimitation = true;
+    // }
     // --- 结束 平移/缩放限制逻辑 ---
 
     if (state.currentLayer === 'mixed') {

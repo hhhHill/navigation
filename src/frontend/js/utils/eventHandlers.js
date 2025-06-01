@@ -2,7 +2,7 @@
  * 事件处理模块 - 负责处理各种用户交互事件
  */
 import { fetchNearbyNodesData, listenToSocket, fetchShortestPath } from '../api/apiService.js';
-import { highlightNearbyNodes, resetNodeAndEdgeColors, highlightEdges, COLORS } from './rengerHelper.js';
+import { highlightNearbyNodes, resetNodeAndEdgeColors, highlightEdges, COLORS } from './renderHelper.js';
 import { showLoadingMessage, showResultMessage, showErrorMessage, removeElement, updateScaleInfo, addConsoleMessage } from './uiUtils.js';
 import { switchToZoomLevel, updateTrafficOnEdges } from '../renderers/mapRenderer.js';
 import { initSigmaEventHandlers, findClosestZoomLevel } from './map_event_helper/sigmaEvents.js';
@@ -61,6 +61,12 @@ function initEventListeners(mapData) {
   
   //初始化侧边栏事件
   initSidebarToggle();
+  
+  // 阻止浏览器默认右键菜单
+  document.addEventListener('contextmenu', function(e) {
+    e.preventDefault();
+  });
+  
   // 绑定控制台清空按钮事件
   const clearConsoleBtn = document.getElementById("clearConsole");
   if (clearConsoleBtn) {

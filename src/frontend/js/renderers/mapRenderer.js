@@ -1,7 +1,7 @@
 /**
  * 地图渲染模块 - 负责处理地图渲染和视图切换
  */
-import { COLORS } from '../utils/rengerHelper.js';
+import { COLORS } from '../utils/renderHelper.js';
 import { fetchZoomClusterData } from '../api/apiService.js';
 import Sigma from 'https://cdn.jsdelivr.net/npm/sigma@3.0.2/+esm';
 import { createNodeImageProgram,NodeImageProgram } from "https://cdn.jsdelivr.net/npm/@sigma/node-image@3.0.0/+esm";
@@ -118,15 +118,15 @@ function initMapRender(data) {
     if (node.is_gas_station) {
       nodeAttributes.type = 'image';
       nodeAttributes.image = "/icons/gas_station.png";
-      nodeAttributes.size = 8; // 增加带图像节点的大小以便更好地显示
+      nodeAttributes.size = 12; // 增加带图像节点的大小以便更好地显示
     } else if (node.is_shopping_mall) {
       nodeAttributes.type = 'image';
       nodeAttributes.image = "/icons/shopping_mall.png";
-      nodeAttributes.size = 8;
+      nodeAttributes.size = 12;
     } else if (node.is_parking_lot) {
       nodeAttributes.type = 'image';
       nodeAttributes.image = "/icons/parking_lot.png";
-      nodeAttributes.size = 8;
+      nodeAttributes.size = 12;
     }
     
     
@@ -134,20 +134,35 @@ function initMapRender(data) {
   });
   
   // 添加边
+  const nodeMap = new Map();
+  state.detailNodes.forEach(node => nodeMap.set(node.id, node));
+
   state.detailEdges.forEach(edge => {
     try {
-      
-      const source = edge.source !== undefined ? edge.source : edge.from;
-      const target = edge.target !== undefined ? edge.target : edge.to;
-      
-      if (source === undefined || target === undefined) {
+
+      const sourceId = edge.source !== undefined ? edge.source : edge.from;
+      const targetId = edge.target !== undefined ? edge.target : edge.to;
+
+      if (sourceId === undefined || targetId === undefined) {
         console.warn("跳过边，缺少source或target:", edge);
         return;
       }
-      
-      originalGraph.addEdge(source, target, {
+
+      const sourceNode = nodeMap.get(sourceId);
+      const targetNode = nodeMap.get(targetId);
+
+      let edgeColor = edge.color || COLORS.ORIGINAL_EDGE;
+
+      // 检查源节点或目标节点是否为特殊地点
+      if (sourceNode && (sourceNode.is_gas_station || sourceNode.is_shopping_mall || sourceNode.is_parking_lot)) {
+        edgeColor = COLORS.LOCATION_EDGE;
+      } else if (targetNode && (targetNode.is_gas_station || targetNode.is_shopping_mall || targetNode.is_parking_lot)) {
+        edgeColor = COLORS.LOCATION_EDGE;
+      }
+
+      originalGraph.addEdge(sourceId, targetId, {
         size:  3, // 使用较小的节点大小
-        color: edge.color || COLORS.ORIGINAL_EDGE,
+        color: edgeColor,
         level: edge.level,
         current_vehicles: edge.current_vehicles,
         capacity: edge.capacity

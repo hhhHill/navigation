@@ -815,20 +815,89 @@ def handle_stop_simulation():
     emit('simulation_status', {'status': 'stopped'})
     print('交通模拟已停止')
 
+def calculate_grid_congestion_data(current_graph, west, south, east, north, grid_size):
+    """
+    辅助函数，用于计算网格拥堵数据。
+    参数:
+        current_graph: 当前的图对象
+        west, south, east, north: 地图边界
+        grid_size: 网格的行/列数
+    返回:
+        包含网格拥堵数据的字典，或在错误时返回None
+    """
+    if current_graph is None or current_graph.spatial_index is None:
+        print("错误 (calculate_grid_congestion_data): 图数据或空间索引尚未加载")
+        return None
+
+    grid_data_list = []
+    map_width = east - west
+    map_height = north - south
+    cell_width = map_width / grid_size
+    cell_height = map_height / grid_size
+
+    # 初始化网格数据结构
+    grid_cells_calc = {}
+    for r_idx in range(grid_size):
+        for c_idx in range(grid_size):
+            cell_west_coord = west + c_idx * cell_width
+            cell_south_coord = south + r_idx * cell_height
+            cell_east_coord = cell_west_coord + cell_width
+            cell_north_coord = cell_south_coord + cell_height
+
+            grid_cells_calc[(r_idx, c_idx)] = {
+                "row": r_idx,
+                "col": c_idx,
+                "bounds": {"west": cell_west_coord, "south": cell_south_coord, "east": cell_east_coord, "north": cell_north_coord},
+                "total_capacity": 0,
+                "current_vehicles": 0,
+                "edge_count": 0,
+                "added_edges": set()
+            }
+
+    for r_idx in range(grid_size):
+        for c_idx in range(grid_size):
+            cell_key_calc = (r_idx, c_idx)
+            cell_bounds_calc = grid_cells_calc[cell_key_calc]["bounds"]
+            query_rect_calc = (cell_bounds_calc["west"], cell_bounds_calc["south"], cell_bounds_calc["east"], cell_bounds_calc["north"])
+
+            vertices_in_cell_calc = current_graph.spatial_index.query_range(query_rect_calc)
+
+            for vertex_calc in vertices_in_cell_calc:
+                for edge_calc in vertex_calc.edges:
+                    edge_id_calc = edge_calc.id
+                    if edge_id_calc not in grid_cells_calc[cell_key_calc]["added_edges"]:
+                        grid_cells_calc[cell_key_calc]["total_capacity"] += edge_calc.capacity
+                        grid_cells_calc[cell_key_calc]["current_vehicles"] += edge_calc.current_vehicles
+                        grid_cells_calc[cell_key_calc]["edge_count"] += 1
+                        grid_cells_calc[cell_key_calc]["added_edges"].add(edge_id_calc)
+    
+    for r_idx in range(grid_size):
+        for c_idx in range(grid_size):
+            cell_data_calc = grid_cells_calc[(r_idx, c_idx)]
+            del cell_data_calc["added_edges"]
+            grid_data_list.append(cell_data_calc)
+    
+    return {
+        "grid_size": grid_size,
+        "bounds": {"west": west, "south": south, "east": east, "north": north},
+        "cells": grid_data_list
+    }
+
 def traffic_simulation_loop():
     """交通模拟循环"""
     global traffic_simulation_running
+    global GRAPH # 确保能访问全局GRAPH对象
     
     while traffic_simulation_running:
         if GRAPH is not None:
             # 更新交通流
             update_traffic_flow(GRAPH)
             
-            # 获取交通颜色和等级
+            # 获取交通颜色和等级 (用于路段)
             traffic_colors = get_traffic_color(GRAPH)
             traffic_levels = get_traffic_level(GRAPH)
             
-            # 构建边数据
+            # 构建路段数据
             edges_data = []
             for edge_id, edge in GRAPH.edges.items():
                 edges_data.append({
@@ -841,11 +910,180 @@ def traffic_simulation_loop():
                     "capacity": edge.capacity
                 })
             
-            # 发送数据到客户端
+            # 发送路段数据到客户端
             socketio.emit('traffic_update', {'edges': edges_data})
+
+            # 计算并发送网格拥堵数据
+            grid_congestion_data = calculate_grid_congestion_data(GRAPH, 0, 0, 2000, 2000, 10)
+            if grid_congestion_data:
+                socketio.emit('grid_congestion_update', grid_congestion_data)
+                # print("已通过WebSocket发送网格拥堵更新") # 可选日志
         
         # 休眠一段时间
-        time.sleep(2)  # 500毫秒更新一次
+        time.sleep(2)  # 每2秒更新一次
+
+@app.route('/api/nearby_special_points', methods=['GET'])
+def get_nearby_special_points():
+    """
+    API端点，用于查找指定点邻域内的特殊点以及到最近特殊点的路径。
+    请求参数:
+        node_id: 中心点的ID (int)
+        radius: 邻域大小 (float)
+    返回:
+        JSON响应，包含邻域内特殊点信息和到最近特殊点的路径信息。
+    """
+    start_time_total = time.time()
+    print("API /api/nearby_special_points 开始处理请求")
+    try:
+        start_time_params = time.time()
+        node_id_str = request.args.get('node_id')
+        radius_str = request.args.get('radius')
+
+        if node_id_str is None or radius_str is None:
+            print("参数缺失: node_id 或 radius")
+            return jsonify({"error": "请求中必须包含 node_id 和 radius 参数"}), 400
+
+        try:
+            node_id = int(node_id_str)
+            radius = float(radius_str)
+        except ValueError:
+            print(f"参数格式错误: node_id='{node_id_str}', radius='{radius_str}'")
+            return jsonify({"error": "node_id 必须是整数, radius 必须是浮点数"}), 400
+
+        global GRAPH
+        if GRAPH is None:
+            print("错误: 图数据尚未加载")
+            return jsonify({"error": "图数据尚未加载完成，请稍后再试"}), 500
+
+        center_vertex = GRAPH.get_vertex(node_id)
+        if center_vertex is None:
+            print(f"错误: 未找到顶点ID {node_id}")
+            return jsonify({"error": f"未找到ID为 {node_id} 的顶点"}), 404
+        end_time_params = time.time()
+        print(f"步骤1: 参数解析及初始检查完成，耗时 {end_time_params - start_time_params:.4f} 秒")
+
+        # 1. 查找邻域内的特殊点
+        start_time_nearby = time.time()
+        nearby_vertices_in_radius = GRAPH.get_vertices_in_radius(center_vertex.x, center_vertex.y, radius)
+        end_time_nearby = time.time()
+        print(f"步骤2: 查找邻域内特殊点完成，耗时 {end_time_nearby - start_time_nearby:.4f} 秒")
+
+        special_points_in_radius = {
+            "gas_stations": {"count": 0, "ids": []},
+            "shopping_malls": {"count": 0, "ids": []},
+            "parking_lots": {"count": 0, "ids": []}
+        }
+
+        for v in nearby_vertices_in_radius:
+            if v.id == center_vertex.id: # Exclude the center node itself from its own neighborhood special points
+                continue
+            attr_type = v.get_attribute_type()
+            if attr_type == 'gas_station':
+                special_points_in_radius["gas_stations"]["count"] += 1
+                special_points_in_radius["gas_stations"]["ids"].append(v.id)
+            elif attr_type == 'shopping_mall':
+                special_points_in_radius["shopping_malls"]["count"] += 1
+                special_points_in_radius["shopping_malls"]["ids"].append(v.id)
+            elif attr_type == 'parking_lot':
+                special_points_in_radius["parking_lots"]["count"] += 1
+                special_points_in_radius["parking_lots"]["ids"].append(v.id)
+
+        # # 2. 查找离中心点最近的各类特殊点及其路径
+        # start_time_paths = time.time()
+        # paths_to_nearest_special_points = {}
+        # special_point_types = ['gas_station', 'shopping_mall', 'parking_lot']
+
+        # for sp_type in special_point_types:
+        #     all_sp_of_type = GRAPH.get_all_vertices_by_type(sp_type)
+        #     if not all_sp_of_type:
+        #         paths_to_nearest_special_points[sp_type] = {"error": f"图中未找到 {sp_type} 类型的点"}
+        #         continue
+
+        #     nearest_sp = None
+        #     shortest_path_info = None
+        #     min_distance = float('inf')
+
+        #     for target_sp in all_sp_of_type:
+        #         if target_sp.id == center_vertex.id: # Cannot path to itself
+        #             continue
+        #         # 使用 find_fastest_path (基于长度) 来计算路径和距离
+        #         # 注意: find_fastest_path 返回 path_vertices, path_edges, total_cost
+        #         # 当 use_traffic=False 时, total_cost 是距离
+        #         path_vertices, path_edges, distance = find_fastest_path(GRAPH, center_vertex, target_sp, use_traffic=False)
+                
+        #         if path_vertices and distance < min_distance:
+        #             min_distance = distance
+        #             nearest_sp = target_sp
+        #             shortest_path_info = {
+        #                 "target_id": target_sp.id,
+        #                 "distance": distance,
+        #                 "path_node_ids": [v.id for v in path_vertices],
+        #                 "path_edge_ids": [e.id for e in path_edges]
+        #             }
+            
+        #     if nearest_sp:
+        #         paths_to_nearest_special_points[sp_type] = shortest_path_info
+        #     else:
+        #         paths_to_nearest_special_points[sp_type] = {"error": f"未能找到从节点 {node_id} 到任何 {sp_type} 的路径"}
+        # end_time_paths = time.time()
+        # print(f"步骤3: 查找最近特殊点及其路径完成，耗时 {end_time_paths - start_time_paths:.4f} 秒")
+
+        response_data = {
+            "center_node_id": node_id,
+            "radius": radius,
+            "special_points_in_radius": special_points_in_radius,
+        }
+
+        end_time_total = time.time()
+        print(f"API /api/nearby_special_points 请求处理完毕，总耗时 {end_time_total - start_time_total:.4f} 秒")
+        return jsonify(response_data)
+
+    except Exception as e:
+        import traceback
+        error_traceback = traceback.format_exc()
+        print(f"处理查询附近特殊点请求时出错: {str(e)}")
+        print(error_traceback)
+        end_time_total = time.time()
+        print(f"API /api/nearby_special_points 请求处理失败，总耗时 {end_time_total - start_time_total:.4f} 秒")
+        return jsonify({"error": str(e), "traceback": error_traceback}), 500
+
+@app.route('/api/grid_congestion', methods=['GET','POST'])
+def get_grid_congestion():
+    """
+    API端点，用于计算固定地图网格的拥堵程度。
+    使用固定边界(0,0)到(2000,2000)，划分为10x10网格。
+    计算每个网格内边的总容量和当前车辆数。
+    利用四叉树空间索引查询网格内的顶点来辅助统计。
+    
+    此端点主要用于初始加载或不支持WebSocket的备选方案。
+    实时更新通过Socket.IO的 'grid_congestion_update' 事件推送。
+        
+    返回:
+        JSON响应，包含每个网格的数据列表。
+    """
+    start_time_total = time.time()
+    print("API /api/grid_congestion 开始处理请求 (固定边界 2000x2000, HTTP端点)")
+    try:
+        # 固定地图边界和网格大小
+        west, south, east, north = 0, 0, 2000, 2000
+        grid_size = 10
+        
+        global GRAPH
+        calculated_data = calculate_grid_congestion_data(GRAPH, west, south, east, north, grid_size)
+
+        if calculated_data is None:
+            return jsonify({"error": "计算网格拥堵数据失败，可能是图数据未加载"}), 500
+
+        end_time_total = time.time()
+        print(f"API /api/grid_congestion HTTP请求处理完毕，总耗时 {end_time_total - start_time_total:.4f} 秒")
+        return jsonify(calculated_data)
+
+    except Exception as e:
+        import traceback
+        error_traceback = traceback.format_exc()
+        print(f"处理网格拥堵HTTP请求时出错: {str(e)}")
+        print(error_traceback)
+        return jsonify({"error": str(e), "traceback": error_traceback}), 500
 
 def run_server(host='127.0.0.1', port=5000, debug=True):
     """

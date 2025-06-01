@@ -164,4 +164,55 @@ async function fetchShortestPath(start_id, end_id) {
   }
 }
 
-export { fetchMapData, fetchNearbyNodesData, fetchQuadtreeData, fetchZoomClusterData, listenToSocket, fetchShortestPath }; 
+/**
+ * 获取指定点附近特殊点的信息以及到最近特殊点的路径
+ * @param {number} nodeId - 中心点的ID
+ * @param {number} radius - 邻域大小 (例如 500)
+ * @returns {Promise<Object>} 包含特殊点信息和路径数据的对象
+ */
+async function fetchNearbySpecialPoints(nodeId, radius) {
+  try {
+    const response = await fetch(`/api/nearby_special_points?node_id=${nodeId}&radius=${radius}`);
+    const responseData = await response.json(); // 尝试解析JSON，无论响应是否OK
+
+    if (!response.ok) {
+      // 即使不是2xx响应，也返回responseData，以便调用者可以处理错误信息
+      console.error('获取附近特殊点信息失败:', responseData);
+      // 你可以决定是抛出错误还是返回错误数据，这里选择返回错误数据
+      // throw new Error(responseData.error || `HTTP error: ${response.status}`); 
+      return responseData; 
+    }
+
+    return responseData;
+  } catch (error) {
+    console.error("请求附近特殊点信息时发生网络错误:", error);
+    throw error; // 重新抛出错误以便调用者处理
+  }
+}
+
+/**
+ * 获取指定点附近特殊点的信息以及到最近特殊点的路径
+ * @param {number} nodeId - 中心点的ID
+ * @param {number} radius - 邻域大小 (例如 500)
+ * @returns {Promise<Object>} 包含特殊点信息和路径数据的对象
+ */
+async function fetchGridCongestion() {
+  try {
+    const response = await fetch(`/api/grid_congestion`);
+    const responseData = await response.json(); // 尝试解析JSON，无论响应是否OK
+
+    if (!response.ok) {
+      // 即使不是2xx响应，也返回responseData，以便调用者可以处理错误信息
+      console.error('获取拥堵信息失败:', responseData);
+      // 你可以决定是抛出错误还是返回错误数据，这里选择返回错误数据
+      // throw new Error(responseData.error || `HTTP error: ${response.status}`); 
+      return responseData; 
+    }
+
+    return responseData;
+  } catch (error) {
+    console.error("请求拥堵信息时发生网络错误:", error);
+    throw error; // 重新抛出错误以便调用者处理
+  }
+}
+export { fetchMapData, fetchNearbyNodesData, fetchQuadtreeData, fetchZoomClusterData, listenToSocket, fetchShortestPath, fetchNearbySpecialPoints, fetchGridCongestion }; 

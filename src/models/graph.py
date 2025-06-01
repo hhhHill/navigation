@@ -325,6 +325,48 @@ class Graph:
         """返回图的详细表示"""
         return self.__str__()
     
+    def get_vertices_in_radius(self, center_x: float, center_y: float, radius: float):
+        """
+        获取指定坐标和半径范围内的所有顶点
+        
+        参数:
+            center_x: 中心点x坐标
+            center_y: 中心点y坐标
+            radius: 查询半径
+            
+        返回:
+            在半径范围内的顶点列表
+        """
+        if not self.spatial_index:
+            self.build_spatial_index()
+
+        if not self.spatial_index: # Still no index (e.g., empty graph)
+            return []
+
+        # Define the query bounding box for the spatial index
+        query_bounds = (center_x - radius, center_y - radius, center_x + radius, center_y + radius)
+        candidate_vertices = self.spatial_index.query_range(query_bounds)
+
+        vertices_in_radius = []
+        for vertex in candidate_vertices:
+            # Calculate squared distance for efficiency, compare with radius squared
+            distance_sq = (vertex.x - center_x)**2 + (vertex.y - center_y)**2
+            if distance_sq <= radius**2:
+                vertices_in_radius.append(vertex)
+        return vertices_in_radius
+
+    def get_all_vertices_by_type(self, attribute_type: str):
+        """
+        获取图中所有指定属性类型的顶点
+        
+        参数:
+            attribute_type: 属性类型字符串 ('gas_station', 'shopping_mall', 'parking_lot')
+            
+        返回:
+            符合条件的顶点列表
+        """
+        return [v for v in self.vertices.values() if v.get_attribute_type() == attribute_type]
+
     def apply_dbscan_clustering(self, eps, min_samples):
         """
         使用四叉树优化的DBSCAN算法对图中的顶点进行聚类

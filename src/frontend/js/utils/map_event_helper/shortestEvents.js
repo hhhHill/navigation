@@ -1,5 +1,5 @@
 import { fetchShortestPath } from '../../api/apiService.js';
-import { resetNodeAndEdgeColors, highlightEdges, COLORS } from '../rengerHelper.js';
+import { resetNodeAndEdgeColors, highlightEdges, COLORS } from '../renderHelper.js';
 import { addConsoleMessage } from '../uiUtils.js';
 
 /**
@@ -165,7 +165,9 @@ function initShortestPathEvents(mapData) {
                 COLORS.FASTEST_PATH,
                 true,
                 COLORS.PATH_NODE,
-                'fastest'
+                'fastest',
+                startId,
+                endId
               );
               addConsoleMessage("已高亮显示最快路径", "success");
             }
@@ -178,7 +180,9 @@ function initShortestPathEvents(mapData) {
                 COLORS.SHORTEST_PATH,
                 true,
                 COLORS.PATH_NODE,
-                'shortest'
+                'shortest',
+                startId,
+                endId
               );
               addConsoleMessage("已高亮显示最短路径", "success");
             }
