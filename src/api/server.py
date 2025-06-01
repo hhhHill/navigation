@@ -406,11 +406,13 @@ def precompute_zoom_level_clusters_DBSCAN(graph):
         
         # 应用DBSCAN算法
         try:
-            cluster_labels, clusters = apply_dbscan(graph, eps=eps, min_samples=min_samples)
-            
-            # 创建DBSCAN实例以获取噪声点
+            # 创建DBSCAN实例并执行聚类
             dbscan = DBSCAN(eps=eps, min_samples=min_samples)
             dbscan.fit(graph)
+            cluster_labels = dbscan.get_cluster_labels()
+            clusters = dbscan.get_clusters()
+            
+            # 获取噪声点
             noise_points = dbscan.get_noise_points(graph)
             
             # 生成相同格式的结果数据
@@ -988,45 +990,6 @@ def get_nearby_special_points():
                 special_points_in_radius["parking_lots"]["count"] += 1
                 special_points_in_radius["parking_lots"]["ids"].append(v.id)
 
-        # # 2. 查找离中心点最近的各类特殊点及其路径
-        # start_time_paths = time.time()
-        # paths_to_nearest_special_points = {}
-        # special_point_types = ['gas_station', 'shopping_mall', 'parking_lot']
-
-        # for sp_type in special_point_types:
-        #     all_sp_of_type = GRAPH.get_all_vertices_by_type(sp_type)
-        #     if not all_sp_of_type:
-        #         paths_to_nearest_special_points[sp_type] = {"error": f"图中未找到 {sp_type} 类型的点"}
-        #         continue
-
-        #     nearest_sp = None
-        #     shortest_path_info = None
-        #     min_distance = float('inf')
-
-        #     for target_sp in all_sp_of_type:
-        #         if target_sp.id == center_vertex.id: # Cannot path to itself
-        #             continue
-        #         # 使用 find_fastest_path (基于长度) 来计算路径和距离
-        #         # 注意: find_fastest_path 返回 path_vertices, path_edges, total_cost
-        #         # 当 use_traffic=False 时, total_cost 是距离
-        #         path_vertices, path_edges, distance = find_fastest_path(GRAPH, center_vertex, target_sp, use_traffic=False)
-                
-        #         if path_vertices and distance < min_distance:
-        #             min_distance = distance
-        #             nearest_sp = target_sp
-        #             shortest_path_info = {
-        #                 "target_id": target_sp.id,
-        #                 "distance": distance,
-        #                 "path_node_ids": [v.id for v in path_vertices],
-        #                 "path_edge_ids": [e.id for e in path_edges]
-        #             }
-            
-        #     if nearest_sp:
-        #         paths_to_nearest_special_points[sp_type] = shortest_path_info
-        #     else:
-        #         paths_to_nearest_special_points[sp_type] = {"error": f"未能找到从节点 {node_id} 到任何 {sp_type} 的路径"}
-        # end_time_paths = time.time()
-        # print(f"步骤3: 查找最近特殊点及其路径完成，耗时 {end_time_paths - start_time_paths:.4f} 秒")
 
         response_data = {
             "center_node_id": node_id,

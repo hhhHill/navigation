@@ -73,4 +73,26 @@ async function initApp() {
 }
 
 // 页面加载后初始化应用程序
-document.addEventListener('DOMContentLoaded', initApp); 
+document.addEventListener('DOMContentLoaded', function() {
+    initApp();
+
+    // 添加可折叠组件的交互逻辑
+    const collapsibleHeaders = document.querySelectorAll('.collapsible-header');
+
+    collapsibleHeaders.forEach(header => {
+        header.addEventListener('click', function() {
+            // 切换header的active类
+            this.classList.toggle('active');
+
+            // 获取对应的内容区域
+            const content = this.nextElementSibling;
+
+            // 切换内容的显示/隐藏
+            if (content.classList.contains('show')) {
+                content.classList.remove('show');
+            } else {
+                content.classList.add('show');
+            }
+        });
+    });
+}); 

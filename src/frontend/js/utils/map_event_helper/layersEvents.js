@@ -112,11 +112,12 @@ function getCongestionColor(congestionRatio) {
 async function renderGridCongestion(mapData, gridData) {
   if (!gridOverlayState.isInitialized) {
     // Ensure initGridOverlay is called with mapData if not initialized
-    if (mapData) initGridOverlay(mapData); 
-    else {
-        console.error('mapData is not available for initGridOverlay during renderGridCongestion');
-        return;
-    }
+    // if (mapData) initGridOverlay(mapData); 
+    // else {
+    //     console.error('mapData is not available for initGridOverlay during renderGridCongestion');
+    //     return;
+    // }
+    return
   }
   
   // Ensure mapData and clusterRenderer are available
@@ -226,7 +227,9 @@ function switchLayer(layerType, mapData) {
       clusterLayer.style.zIndex = "5";
       state.lastOriginalCameraState = originalRenderer.getCamera().getState();
       originalRenderer.refresh();
-
+      if (gridOverlayState.canvas) {
+        gridOverlayState.canvas.style.display = 'block';
+      }
       // 设置原始图层主题色和背景色
       root.style.setProperty('--theme-color', getComputedStyle(root).getPropertyValue('--original-theme').trim());
       root.style.setProperty('--current-sidebar-bg', getComputedStyle(root).getPropertyValue('--original-sidebar-bg').trim());
@@ -289,7 +292,9 @@ function switchLayer(layerType, mapData) {
       originalLayer.style.zIndex = "10";
       clusterLayer.style.display = "block";
       clusterLayer.style.zIndex = "5";
-
+      if (gridOverlayState.canvas) {
+        gridOverlayState.canvas.style.display = 'block';
+      }
       // 从 clusterRenderer 同步镜头状态到 originalRenderer
       const currentClusterCameraState = clusterRenderer.getCamera().getState();
       const originalCamera = originalRenderer.getCamera();

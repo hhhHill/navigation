@@ -44,8 +44,8 @@ export function generateSidebar(currentPage) {
     // 获取当前页面配置，如果未找到则使用默认配置
     const config = pageConfigs[currentPage] || pageConfigs['default'];
     
-    // 导航项定义
-    const navItems = [
+    // 修改导航项结构以支持文件夹
+    const navStructure = [
         {
             id: 'map',
             icon: '🗺️',
@@ -53,25 +53,56 @@ export function generateSidebar(currentPage) {
             url: 'map'
         },
         {
-            id: 'quadtree-viz',
-            icon: '🌲',
-            text: '四叉树可视化',
-            url: 'quadtree-viz'
+            id: 'frontend',
+            text: '前端',
+            isFolder: true,
+            children: [
+                // 原来的导航地图项已移出
+            ]
+        },
+        {
+            id: 'backend',
+            text: '后端',
+            isFolder: true,
+            children: [
+                 {
+                    id: 'quadtree-viz',
+                    icon: '🌲',
+                    text: '四叉树可视化',
+                    url: 'quadtree-viz'
+                }
+            ]
         }
     ];
 
-    // 生成导航项HTML
-    const renderNavItems = () => {
-        return navItems.map((item, index) => {
-            const isActive = currentPage === item.id;
-            return `
-                <li class="nav-item ${isActive ? 'active' : ''} animate__animated animate__fadeInLeft" style="animation-delay: ${0.1 * (index + 1)}s;">
-                    <a href="${item.url}">
-                        <span class="nav-icon">${item.icon}</span>
-                        <span class="nav-text">${item.text}</span>
-                    </a>
-                </li>
-            `;
+    // 递归生成导航项和文件夹的HTML
+    const renderNavItemsRecursive = (items, level = 0) => {
+        return items.map((item, index) => {
+            if (item.isFolder) {
+                return `
+                    <li class="nav-item collapsible-container animate__animated animate__fadeInLeft" style="animation-delay: ${0.1 * (index + 1 + level * 0.5)}s;">
+                        <div class="collapsible-header">
+                            ${item.text}
+                            <span class="toggle-icon">▶</span>
+                        </div>
+                        <div class="collapsible-content">
+                            <ul>
+                                ${renderNavItemsRecursive(item.children, level + 1)}
+                            </ul>
+                        </div>
+                    </li>
+                `;
+            } else {
+                 const isActive = currentPage === item.id;
+                return `
+                    <li class="nav-item ${isActive ? 'active' : ''} animate__animated animate__fadeInLeft" style="animation-delay: ${0.1 * (index + 1 + level * 0.5)}s;">
+                        <a href="${item.url}">
+                            <span class="nav-icon">${item.icon}</span>
+                            <span class="nav-text">${item.text}</span>
+                        </a>
+                    </li>
+                `;
+            }
         }).join('');
     };
 
@@ -100,7 +131,7 @@ export function generateSidebar(currentPage) {
             </div>
             <nav class="sidebar-nav">
                 <ul>
-                    ${renderNavItems()}
+                    ${renderNavItemsRecursive(navStructure)}
                 </ul>
             </nav>
             ${renderSectionContent(config.sectionTitle, config.sectionContent, 0.3)}

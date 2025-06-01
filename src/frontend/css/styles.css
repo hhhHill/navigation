@@ -73,6 +73,9 @@ html {
     
     /* 主题色过渡效果 */
     --theme-transition: background-color 0.5s ease, color 0.5s ease, border-color 0.5s ease;
+
+    /* 可折叠组件背景色变深程度 */
+    --collapsible-darken-percentage: 8%; /* 控制变深程度，例如 8% 混合黑色 */
 }
 
 body {
@@ -1044,4 +1047,56 @@ html .console-header {
 
 .path-legend p strong {
     font-weight: 600;
+}
+
+.collapsible-container {
+    margin-bottom: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    overflow: hidden; /* 隐藏溢出内容 */
+}
+
+.collapsible-header {
+    background-color: color-mix(in srgb, var(--current-sidebar-bg), black var(--collapsible-darken-percentage));
+    color: #333;
+    cursor: pointer;
+    padding: 10px;
+    width: 100%;
+    border: none;
+    text-align: left;
+    outline: none;
+    font-size: 16px;
+    transition: background-color 0.2s ease;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.collapsible-header:hover {
+    background-color: #ddd;
+}
+
+.collapsible-header.active {
+    background-color: #ccc;
+}
+
+.collapsible-content {
+    padding: 0 10px;
+    background-color: color-mix(in srgb, var(--current-sidebar-bg), black var(--collapsible-darken-percentage));
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease-out, padding 0.3s ease-out;
+}
+
+.collapsible-content.show {
+    max-height: 500px; /* 足够大的值以显示内容 */
+    padding: 10px;
+}
+
+.toggle-icon {
+    transition: transform 0.3s ease;
+}
+
+.collapsible-header.active .toggle-icon {
+    transform: rotate(90deg); /* 展开时旋转图标 */
 }
