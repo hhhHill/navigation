@@ -99,6 +99,24 @@ async function fetchQuadtreeData() {
 }
 
 /**
+ * 获取三角剖分和外接圆数据
+ * @returns {Promise<Object>} 包含三角形和外接圆数据的对象
+ */
+async function fetchTriangulationData() {
+  try {
+    const response = await fetch('/api/triangulation');
+    if (!response.ok) {
+      throw new Error(`HTTP error fetching triangulation data: ${response.status}`);
+    }
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error("获取三角剖分数据失败:", error);
+    throw error;
+  }
+}
+
+/**
  * 监听WebSocket服务器发送的消息
  * @param {string} eventName - 要监听的事件名称
  * @param {Function} callback - 收到消息时调用的回调函数
@@ -204,8 +222,7 @@ async function fetchGridCongestion() {
     if (!response.ok) {
       // 即使不是2xx响应，也返回responseData，以便调用者可以处理错误信息
       console.error('获取拥堵信息失败:', responseData);
-      // 你可以决定是抛出错误还是返回错误数据，这里选择返回错误数据
-      // throw new Error(responseData.error || `HTTP error: ${response.status}`); 
+
       return responseData; 
     }
 
@@ -215,4 +232,4 @@ async function fetchGridCongestion() {
     throw error; // 重新抛出错误以便调用者处理
   }
 }
-export { fetchMapData, fetchNearbyNodesData, fetchQuadtreeData, fetchZoomClusterData, listenToSocket, fetchShortestPath, fetchNearbySpecialPoints, fetchGridCongestion }; 
+export { fetchMapData, fetchNearbyNodesData, fetchQuadtreeData, fetchZoomClusterData, listenToSocket, fetchShortestPath, fetchNearbySpecialPoints, fetchGridCongestion, fetchTriangulationData }; 

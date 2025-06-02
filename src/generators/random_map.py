@@ -3,10 +3,12 @@
 """
 import random
 import math
+import json
+import os
 from ..models.graph import Graph
 from ..models.vertex import Vertex
 from ..models.edge import Edge
-from .delaunay import create_delaunay_triangulation
+from .delaunay import create_delaunay_triangulation,circumcircle
 
 def generate_random_points(n=10000, x_min=0, y_min=0, x_max=10000, y_max=10000, min_distance=0):
     """
@@ -183,7 +185,53 @@ def generate_connected_map(vertices, edge_factor=2.5, capacity_range=(50, 200)):
     # 使用Delaunay三角剖分创建初始连接
     triangulation = create_delaunay_triangulation(vertices)
     
-    # 从三角剖分中提取边
+    # Prepare triangulation data for JSON serialization
+    triangles_list = []
+    circumcircles_list = [] # List to store circumcircle data
+    
+    for triangle in triangulation:
+        # Assuming triangle is a tuple of Vertex objects (v1, v2, v3)
+        v1, v2, v3 = triangle
+        # Convert triangle vertices to a list of vertex IDs
+        triangles_list.append([v1.id, v2.id, v3.id])
+
+        # Calculate the circumcircle for the triangle
+        try:
+            center_x, center_y, radius = circumcircle(v1, v2, v3)
+            circumcircles_list.append({
+                "vertices": [v1.id, v2.id, v3.id],
+                "center_x": center_x,
+                "center_y": center_y,
+                "radius": radius
+            })
+        except Exception as e:
+            print(f"Warning: Could not calculate circumcircle for triangle {v1.id},{v2.id},{v3.id}: {e}")
+
+
+
+
+    triangulation_data_dict = {
+        "triangles": triangles_list,
+        "circumcircles": circumcircles_list # Add the circumcircles data
+    }
+
+
+    current_dir = os.path.dirname(__file__)
+    data_dir = os.path.join(current_dir, '..', '..', 'data')
+    output_file = os.path.join(data_dir, 'triangulation.json')
+
+    # Ensure the data directory exists
+    os.makedirs(data_dir, exist_ok=True)
+
+    # Save the triangulation data to the JSON file
+    try:
+        with open(output_file, 'w', encoding='utf-8') as f:
+            json.dump(triangulation_data_dict, f, indent=4)
+        print(f"Successfully saved triangulation data to {output_file}")
+    except Exception as e:
+        print(f"Error saving triangulation data to {output_file}: {e}")
+
+    # From triangulation extract edges
     edges = set()
     for triangle in triangulation:
         v1, v2, v3 = triangle

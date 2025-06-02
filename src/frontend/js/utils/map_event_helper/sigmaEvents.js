@@ -109,20 +109,9 @@ function initSigmaEventHandlers(mapData) {
           state.activeNearbySearch = {
             targetNodeId: nodeId,
             relatedEdgeIds: relatedEdgeIds,
-            // 保存原始颜色以便恢复，如果resetNodeAndEdgeColors不够精细
-            // targetOriginalColor: originalGraph.getNodeAttribute(nodeId, 'color'),
-            // targetOriginalSize: originalGraph.getNodeAttribute(nodeId, 'size'),
-            // relatedEdgesOriginalStyles: relatedEdgeIds.map(edgeId => ({
-            //   id: edgeId,
-            //   color: originalGraph.getEdgeAttribute(edgeId, 'color'),
-            //   size: originalGraph.getEdgeAttribute(edgeId, 'size'),
-            // }))
+
           };
 
-          // 1. 调暗所有其他节点和边 (可选，如果highlightNearbyNodes已处理，则这里不需要)
-          // resetNodeAndEdgeColors 会重置所有，highlightNearbyNodes 会高亮选中的并调暗其他的
-          // 由于 handleNearbyNodesRequest 内部调用了 highlightNearbyNodes，
-          // 此时所有非相关的节点和边应该已经被调暗了。
 
           // 2. 特别标记目标点
           if (originalGraph.hasNode(nodeId)) {
@@ -174,7 +163,7 @@ function initSigmaEventHandlers(mapData) {
             // 显示信息框，列出找到的特殊点
             let infoContent = {
               '节点ID': nodeId,
-              '半径': '5000米', // 注意这里半径应与请求一致
+              '半径': '50米', // 注意这里半径应与请求一致
               '特殊点总数': totalSpecialPoints
             };
             
@@ -189,23 +178,12 @@ function initSigmaEventHandlers(mapData) {
                 infoContent['停车场'] = data.special_points_in_radius.parking_lots.ids.map(id => `ID: ${id}`).join(', ');
             }
 
-            // // 也可以添加到最近特殊点的路径信息
-            // if (data.paths_to_nearest_special_points) {
-            //     let pathsInfo = [];
-            //     for (const type in data.paths_to_nearest_special_points) {
-            //         const pathInfo = data.paths_to_nearest_special_points[type];
-            //         if (pathInfo && pathInfo.target_id !== undefined) { // 检查路径信息是否存在且有效
-            //              pathsInfo.push(`${type} (最近点ID: ${pathInfo.target_id}, 距离: ${pathInfo.distance.toFixed(2)}米)`);
-            //         }
-            //     }
-            //      if (pathsInfo.length > 0) {
-            //         infoContent['到最近特殊点路径'] = pathsInfo.join('\n');
-            //     }
-            // }
-            
             // 使用鼠标事件坐标显示信息框
-            const clickX = event.original?.clientX || 0;
-            const clickY = event.original?.clientY || 0;
+            let clickX = originalGraph.getNodeAttribute(nodeId, 'x');
+            let clickY = originalGraph.getNodeAttribute(nodeId, 'y');
+            clickX = originalRenderer.graphToViewport({x: clickX, y: clickY}).x;
+            clickY = originalRenderer.graphToViewport({x: clickX, y: clickY}).y;
+            addConsoleMessage(clickX, clickY);
             showInfoBox(infoContent, `节点 ${nodeId} 附近的特殊点信息`, clickX, clickY);
           } else {
             console.log("在指定半径内未找到特殊点");
@@ -232,12 +210,9 @@ function initSigmaEventHandlers(mapData) {
 
     const infoToShow = {
       'ID': event.edge,
-      '名称': edgeAttributes.label || '未命名',
-      '颜色': edgeAttributes.color,
       '大小': edgeAttributes.size ? edgeAttributes.size.toFixed(2) : 'N/A',
       '车辆数': edgeAttributes.current_vehicles !== undefined ? edgeAttributes.current_vehicles : 'N/A',
       '容量': edgeAttributes.capacity !== undefined ? edgeAttributes.capacity : 'N/A',
-      '等级': edgeAttributes.level !== undefined ? edgeAttributes.level : 'N/A',
       // 可以根据需要添加更多属性
     };
 

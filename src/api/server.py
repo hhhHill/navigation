@@ -25,6 +25,9 @@ GRAPH = None
 # 缓存不同缩放等级的DBSCAN聚类结果
 ZOOM_LEVEL_CLUSTERS = {}
 
+# 缓存不同缩放等级的KMeans聚类结果
+ZOOM_LEVEL_KMEANS_CLUSTERS = {}
+
 # 导入DBSCAN
 from src.algorithms.DBSCAN import DBSCAN, apply_dbscan
 # 导入KMeans和Mini-Batch KMeans
@@ -208,6 +211,33 @@ def get_quadtree_data():
 def quadtree_viz_page():
     """提供四叉树可视化页面"""
     return send_from_directory(os.path.join(app.static_folder, 'html'), 'quadtree.html')
+
+@app.route('/api/triangulation')
+def get_triangulation_data():
+    """提供三角剖分和外接圆数据的API端点"""
+    try:
+
+        data_file = os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'triangulation.json')
+        
+        if not os.path.exists(data_file):
+            return jsonify({"error": "Triangulation data file not found."}), 404
+            
+        with open(data_file, 'r', encoding='utf-8') as f:
+            triangulation_data = json.load(f)
+            
+        return jsonify(triangulation_data)
+        
+    except Exception as e:
+        import traceback
+        error_traceback = traceback.format_exc()
+        print(f"Error processing triangulation data request: {str(e)}")
+        print(error_traceback)
+        return jsonify({"error": str(e), "traceback": error_traceback}), 500
+
+@app.route('/triangulation-viz')
+def triangulation_viz_page():
+    """提供三角剖分可视化页面"""
+    return send_from_directory(os.path.join(app.static_folder, 'html'), 'triangulation.html')
 
 @app.route('/')
 def index_page():
@@ -443,8 +473,9 @@ def precompute_zoom_level_clusters_DBSCAN(graph):
                         "cluster_id": i,
                         "cluster_size": len(cluster),
                         "eps": eps,
-                        "zoom_level": zoom_level
-                    })
+                        "zoom_level": zoom_level,
+                        "node_ids": [vertex.id for vertex in cluster] # 添加集群包含的节点ID列表
+                    })  
             
             # 添加噪声点
             for noise_point in noise_points:
@@ -1048,6 +1079,154 @@ def get_grid_congestion():
         print(error_traceback)
         return jsonify({"error": str(e), "traceback": error_traceback}), 500
 
+def precompute_zoom_level_clusters_KMeans(graph):
+    """
+    为所有预定义的缩放等级预计算Mini-Batch KMeans聚类结果
+    
+    参数:
+        graph: 图对象
+    """
+    global ZOOM_LEVEL_CLUSTERS
+    # ZOOM_LEVEL_KMEANS_CLUSTERS = {}
+    
+    # 获取节点总数
+    node_count = len(graph.vertices)
+    print(f"开始为 {node_count} 个节点预计算不同缩放等级的KMeans聚类...")
+    
+    # 定义要处理的缩放等级
+    # 适应sigmajs的缩放等级范围(0.1-5)
+    # 可以根据需要调整这些缩放等级
+    zoom_levels = [0.3, 0.5, 1.0]
+    
+    for zoom_level in zoom_levels:
+        print(f"预计算缩放等级 {zoom_level} 的KMeans聚类...")
+        start_time = time.time()
+        
+        # 根据zoom_level设置K值，参考get_kmeans_clusters的逻辑
+        if zoom_level <= 0.3:
+            n_clusters = 1000
+        elif zoom_level <= 0.5:
+            n_clusters = 500
+        elif zoom_level <= 1.0:
+            n_clusters = 300
+
+
+        # 确保n_clusters不超过节点总数
+        n_clusters = min(n_clusters, node_count)
+        
+        # Mini-Batch KMeans 参数
+        batch_size = 256 # Mini-Batch 大小，可以根据需要调整
+        max_iter = 100   # Mini-batch 通常需要较少的迭代
+        tol = 1e-3       # 收敛容忍度
+        max_no_improvement = 10 # 提前停止参数
+
+        print(f"缩放等级 {zoom_level} 使用Mini-Batch KMeans参数: n_clusters={n_clusters}, batch_size={batch_size}")
+        
+        try:
+            # 应用Mini-Batch KMeans算法
+            cluster_labels, centroids = apply_mini_batch_kmeans(
+                graph,
+                n_clusters=n_clusters,
+                batch_size=batch_size,
+                max_iter=max_iter,
+                tol=tol,
+                max_no_improvement=max_no_improvement
+            )
+            
+            # 构建聚类代表点（质心）节点
+            result_nodes = []
+            cluster_members = {} # 用于存储每个集群的节点ID列表
+            
+            # 建立簇ID到质心节点的映射
+            centroid_map = {}
+            for i, centroid in enumerate(centroids):
+                 # 过滤掉无效的质心
+                if centroid is not None and not (isinstance(centroid, float) and math.isnan(centroid)):
+                    centroid_id = f"centroid_{i}"
+                    centroid_map[i] = {
+                         "id": centroid_id,
+                         "label": f"Cluster {i} (z{zoom_level})",
+                         "x": float(centroid[0]),
+                         "y": float(centroid[1]),
+                         "size": 3, # 初始大小
+                         "cluster_id": i,
+                         "zoom_level": zoom_level,
+                         "node_ids": [] # 占位符，后续填充
+                    }
+                    result_nodes.append(centroid_map[i])
+                    cluster_members[i] = []
+            
+            # 填充每个集群的节点ID列表，并更新质心节点的大小
+            cluster_sizes = {} # 用于统计每个集群的成员数量
+            # cluster_labels 是一个字典 {vertex_id: cluster_id} for vertices that were assigned a cluster
+            for vertex_id, cluster_id in cluster_labels.items():
+                 if cluster_id in cluster_members:
+                      cluster_members[cluster_id].append(vertex_id)
+                      cluster_sizes[cluster_id] = cluster_sizes.get(cluster_id, 0) + 1
+            
+            # 更新result_nodes中的size和node_ids
+            for node_data in result_nodes:
+                 cluster_id = node_data["cluster_id"]
+                 node_data["size"] = cluster_sizes.get(cluster_id, 1) # 使用集群大小，如果没有成员至少给1
+                 node_data["node_ids"] = cluster_members.get(cluster_id, [])
+
+
+            # 构建质心之间的边
+            result_edges = []
+            edge_set = set()
+            # vertex_to_cluster 是 {vertex_id: cluster_id} 字典
+            vertex_to_cluster = cluster_labels
+
+            for edge_id, edge in graph.edges.items():
+                v1_id = edge.vertex1.id
+                v2_id = edge.vertex2.id
+                c1 = vertex_to_cluster.get(v1_id)
+                c2 = vertex_to_cluster.get(v2_id)
+
+                # 检查两个顶点是否都被分配到某个簇，且属于不同的簇
+                if c1 is not None and c2 is not None and c1 != c2:
+                     # 确保对应的质心节点存在
+                     if c1 in centroid_map and c2 in centroid_map:
+                        # 使用质心节点ID作为边的source和target
+                        source_id = centroid_map[min(c1, c2)]["id"]
+                        target_id = centroid_map[max(c1, c2)]["id"]
+
+                        edge_key = f"{source_id}_{target_id}"
+                        if edge_key not in edge_set:
+                            edge_set.add(edge_key)
+                            result_edges.append({
+                                "id": f"{edge_key}_z{zoom_level}",
+                                "source": source_id,
+                                "target": target_id,
+                                "zoom_level": zoom_level
+                            })
+            
+            # 存储结果
+            ZOOM_LEVEL_CLUSTERS[zoom_level] = {
+                "nodes": result_nodes,
+                "edges": result_edges,
+                "params": {
+                    "n_clusters": n_clusters,
+                    "batch_size": batch_size,
+                    "max_iter": max_iter,
+                    "tol": tol,
+                    "max_no_improvement": max_no_improvement,
+                    "node_count": node_count,
+                    "zoom_level": zoom_level,
+                    "cluster_count": len(centroids)
+                }
+            }
+            
+            process_time = time.time() - start_time
+            print(f"缩放等级 {zoom_level} 的KMeans聚类完成，耗时 {process_time:.2f} 秒，生成了 {len(result_nodes)} 个质心节点和 {len(result_edges)} 条边")
+            
+        except Exception as e:
+            print(f"预计算缩放等级 {zoom_level} 的KMeans聚类时出错: {str(e)}")
+            import traceback
+            print(traceback.format_exc())
+    
+    print("所有缩放等级的KMeans聚类预计算完成")
+
 def run_server(host='127.0.0.1', port=5000, debug=True):
     """
     运行Flask服务器
@@ -1127,7 +1306,8 @@ def run_server(host='127.0.0.1', port=5000, debug=True):
         
         # 预计算不同缩放等级的聚类结果
         # 如需切换为DBSCAN预计算，请改为 precompute_zoom_level_clusters_DBSCAN(GRAPH)
-        precompute_zoom_level_clusters_DBSCAN(GRAPH)
+        # precompute_zoom_level_clusters_DBSCAN(GRAPH)
+        precompute_zoom_level_clusters_KMeans(GRAPH)
         
     except Exception as e:
         import traceback
